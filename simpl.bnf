@@ -1,0 +1,39 @@
+Root    ::= Stmt
+        <$>
+
+Stmt    ::= Fact Stmt'
+        <$>
+
+Stmt'   ::= epsilon
+        <+> , Fact Stmt'
+        <$>
+
+Fact    ::= epsilon
+        <+> Expr Fact'
+        <+> module Id { Stmt }
+        <$>
+
+Fact'   ::= epsilon
+        <+> = Expr
+        <$>
+
+Expr    ::= RtoL Atom IModule LtoR
+        <+> Atom IModule LtoR
+        <$>
+
+LtoR    ::= epsilon
+        <+> Binary Atom LtoR
+        <$>
+
+IModule ::= epsilon
+        <+> ( Stmt )
+        <$>
+
+RtoL    ::= Unary <$>
+
+Unary   ::= ! <+> - <$>
+
+Binary  ::= + <+> - <+> * <+> / <+> > <+> >= <+> < <+> <=
+        <+> == <+> != <+> | <+> || <+> & <+> && <+> . <$>
+
+Atom    ::= Id <+> Number <$>

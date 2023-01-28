@@ -52,18 +52,24 @@ struct Number : Base {
     bool over(std::string_view const &view) override { return view.size() > 1 && !match(view); }
 };
 
-struct Comment : Base {
-    using Base::Base;
-    [[nodiscard]] std::string show() const override { return "comment"; }
-    bool match(std::string_view const &view) override { return view.size() > 2 || view.back() == '/'; }
-    bool over(std::string_view const &view) override { return view.size() > 1 && isEol(view.back()); }
+struct StrRegion : Base {
+    StrRegion(std::string head, std::string tail, Kind kind)
+        : Base(kind), head(std::move(head)), tail(std::move(tail)) {}
+    [[nodiscard]] std::string show() const override { return head + "..." + tail; }
+    bool match(std::string_view const &view) override {
+        return view.size() > head.size() || view.back() == head[view.size() - 1];
+    }
+    bool over(std::string_view const &view) override {
+        return view.size() > 2 && view.substr(0, view.size() - 1).ends_with(tail);
+    }
+    std::string const head, tail;
 };
 
 struct CharRegion : Base {
     CharRegion(char left, char right, Kind kind) : Base(kind), left(left), right(right) {}
-    [[nodiscard]] std::string show() const override { return std::format("{}region{}", left, right); }
+    [[nodiscard]] std::string show() const override { return std::format("{}...{}", left, right); }
     bool match(std::string_view const &view) override { return view.size() > 1 || view.front() == left; }
-    bool over(std::string_view const &view) override { return view.size() > 2 && *(view.end() - 2) == right; }
+    bool over(std::string_view const &view) override { return view.size() > 2 && *(view.rbegin() - 1) == right; }
     char const left;
     char const right;
 };

@@ -151,7 +151,8 @@ void run(char const *filename) {
             std::make_shared<StrFixed>("<=>", Kind::Spaceship),
             std::make_shared<Id>(Kind::Id),
             std::make_shared<Number>(Kind::Number),
-            std::make_shared<Comment>(Kind::Comment),
+            std::make_shared<StrRegion>("//", "\n", Kind::Comment),
+            std::make_shared<StrRegion>("/*", "*/", Kind::Comment),
         };
     }();
 

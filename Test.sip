@@ -1,5 +1,8 @@
 // module Test
-main = Arithmetic(lhs = three, rhs = nine).mul,
+main = Eq(x = b, y = b).extract,
+b = false,
+
+n27 = Arithmetic(lhs = three, rhs = nine).mul,
 
 three = Arithmetic(lhs = 1, rhs = 2).add,
 nine = Unary(val = 3).square,

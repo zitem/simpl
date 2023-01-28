@@ -88,6 +88,7 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {    "Atom",               "Atom"},
     { "IModule",            "IModule"},
     {   "Annot",              "Annot"},
+    {    "Bool",               "Bool"},
 
     {   "GRoot",              "GRoot"},
     {   "GFact",              "GFact"},
@@ -99,6 +100,8 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
 
 Context::Context(std::string const &file) : _modules(builtinModules::all()), file(file) {
     modules = builtinModules::genMap(_modules);
+    sets["bool"] = std::make_unique<set::Identity>();
+    sets["int"] = std::make_unique<set::Identity>();
 }
 
 std::pair<Node::Pos, Node::Pos> Node::getRange(std::string const &str) const {
@@ -164,8 +167,7 @@ std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
         if (!setsfind->second) {
             return nullptr;
         }
-        auto copy = setsfind->second->cast<set::Number>();
-        return std::make_unique<set::Number>(copy);
+        return setsfind->second->clone();
     }
     auto facts = params.module->getFacts();
     auto factFind = facts.facts.equal_range(str());
@@ -190,10 +192,6 @@ std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     printCode(ctx.file);
     std::cout << std::flush;
     return nullptr;
-}
-
-std::unique_ptr<set::ISet> Int::solve(Context & /*ctx*/) const {
-    return std::make_unique<set::Number>(value());
 }
 
 std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
@@ -261,11 +259,9 @@ void Nonterm::pushArgs(std::vector<std::unique_ptr<Token>> tokens) {
 
 Set::Set(std::string_view view, Module *parent) : Token(Kind::Atom, view), parent(parent) {}
 
-void Set::setAnnotation(std::unique_ptr<Token> &&set) {
+void Set::setSuperset(std::unique_ptr<Token> &&set) {
     annotation.reset(&set.release()->cast<Set>());
 }
-
-Int::Int(std::string_view view) : Token(Kind::Number, view) {}
 
 Expression::Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&module)
     : Token(Kind::Expr, module->combine(*extract)), extract(std::move(extract)), module(std::move(module)) {}
@@ -325,10 +321,6 @@ void Nonterm::print(size_t indent) const {
 }
 
 void Set::print(size_t indent) const {
-    std::cout << std::string(indent * 2, ' ') << view << "\n";
-}
-
-void Int::print(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << view << "\n";
 }
 

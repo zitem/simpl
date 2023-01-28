@@ -47,7 +47,7 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         case Kind::Id: {
             auto lhs = genAst(nonterm(0), ctx);
             if (auto ann = genAst(nonterm(1), ctx)) {
-                lhs->cast<Set>().setAnnotation(std::move(ann));
+                lhs->cast<Set>().setSuperset(std::move(ann));
             }
             return std::make_unique<Fact>(std::move(lhs), genAst(nonterm(2), ctx));
         }
@@ -109,6 +109,8 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
 
     case Kind::Id: return std::make_unique<Set>(self.view, ctx.currentModule.top());
 
+    case Kind::Bool: return std::make_unique<Bool>(self.view);
+
     case Kind::Number: return std::make_unique<Int>(self.view);
 
     default: return nullptr;
@@ -120,6 +122,8 @@ void run(char const *filename) {
         using namespace token;
         return std::vector<std::shared_ptr<Base>>{
             std::make_shared<StrFixed>("module", Kind::Module),
+            std::make_shared<StrFixed>("false", Kind::Bool),
+            std::make_shared<StrFixed>("true", Kind::Bool),
             std::make_shared<CharRegion>('\'', '\'', Kind::Apostrophe),
             std::make_shared<CharRegion>('"', '"', Kind::Quotation),
             std::make_shared<CharFixed>('=', Kind::SingleEqual),
@@ -197,7 +201,7 @@ void run(char const *filename) {
     auto solved = expr.solve(ctx);
 
     if (solved) {
-        Quiet<style::blue>(), "> ", solved->cast<set::Number>().value(), "\n";
+        Quiet<style::blue>(), "> ", solved->show(), "\n";
     } else {
         Quiet<style::blue>(), "> unsolved module '", root.getName(), "'\n";
     }

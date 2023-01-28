@@ -12,6 +12,11 @@ struct BuiltinFact : node::Fact {
     std::string name;
 };
 
+struct Eq: BuiltinFact {
+    Eq();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
 struct Add : BuiltinFact {
     Add();
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;

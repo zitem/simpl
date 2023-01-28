@@ -81,6 +81,7 @@ struct Kind {
         Atom,
         IModule,
         Annot,
+        Bool,
 
         GRoot,
         GFact,
@@ -129,6 +130,7 @@ struct Token : Node {
     int size{};
     [[nodiscard]] std::string show() const { return kind.show(); }
     template <typename T> [[nodiscard]] T &cast() { return *static_cast<T *>(this); }
+    template <typename T> [[nodiscard]] T const &cast() const { return *static_cast<T const *>(this); }
     virtual void print(size_t indent = 0) const;
     [[nodiscard]] virtual std::unique_ptr<set::ISet> solve(Context &ctx) const { return (void)ctx, nullptr; }
 };
@@ -143,17 +145,30 @@ struct Set : Token {
     Module *parent{};
     std::unique_ptr<Set> annotation;
     Set(std::string_view view, Module *parent = nullptr);
-    void setAnnotation(std::unique_ptr<Token> &&set);
+    void setSuperset(std::unique_ptr<Token> &&set);
     [[nodiscard]] std::string value() const { return std::string(view); }
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     void print(size_t indent = 0) const override;
 };
 
-struct Int : Token {
-    Int(std::string_view view);
-    [[nodiscard]] int value() const { return std::stoi(std::string(view)); }
+template <typename Derived> struct BaseSet : Token {
+    BaseSet(std::string_view view) : Token(Kind::Number, view) {}
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
-    void print(size_t indent = 0) const override;
+    void print(size_t indent = 0) const override { std::cout << std::string(indent * 2, ' ') << view << "\n"; }
+};
+
+struct Bool : BaseSet<Bool> {
+    using BaseSet::BaseSet;
+    using Set = set::Bool;
+    constexpr static auto name = "bool";
+    [[nodiscard]] bool value() const { return view.compare("true") == 0; }
+};
+
+struct Int : BaseSet<Int> {
+    using BaseSet::BaseSet;
+    using Set = set::Int;
+    constexpr static auto name = "int";
+    [[nodiscard]] int value() const { return std::stoi(std::string(view)); }
 };
 
 struct Expression : Token {
@@ -204,9 +219,14 @@ private:
 struct Context {
     Context(std::string const &file);
     std::map<std::string, node::Module *> modules;
+    std::map<std::string, std::unique_ptr<set::ISet>> sets;
     std::stack<node::Module *> currentModule;
     std::stack<std::unique_ptr<set::Sets>> params;
     std::string const &file;
 private:
     std::vector<std::unique_ptr<node::Module>> _modules;
 };
+
+template <typename Derived> std::unique_ptr<set::ISet> node::BaseSet<Derived>::solve(Context &ctx) const {
+    return std::make_unique<typename Derived::Set>(cast<Derived>().value(), ctx.sets.at(Derived::name).get());
+}

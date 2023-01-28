@@ -23,6 +23,7 @@ Expr    ::= RtoL Expr' LtoR
 
 Expr'   ::= Id Extract
         <+> Number
+        <+> Bool
         <$>
 
 Extract ::= epsilon

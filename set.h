@@ -7,23 +7,86 @@ class Module;
 namespace set {
 
 struct ISet {
+    ISet(ISet *superset) : superset(superset) {}
+    ISet *superset{};
+    virtual ~ISet() = default;
+    [[nodiscard]] virtual size_t range() const { return 0; }
+    // [[nodiscard]] virtual std::unique_ptr<ISet> belongs(ISet const &set) const { return set == *superset; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> operator+(ISet const &set) const { return (void)set, nullptr; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> operator-(ISet const &set) const { return (void)set, nullptr; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> operator*(ISet const &set) const { return (void)set, nullptr; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> operator/(ISet const &set) const { return (void)set, nullptr; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> operator|(ISet const &set) const { return (void)set, nullptr; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const {
+        return (void)set, (void)super, nullptr;
+    }
+    [[nodiscard]] virtual std::string show() const { return "interface"; }
     template <typename T> [[nodiscard]] T &cast() { return *static_cast<T *>(this); }
+    template <typename T> [[nodiscard]] T const &cast() const { return *static_cast<T const *>(this); }
+    [[nodiscard]] virtual std::unique_ptr<ISet> clone() const { return std::make_unique<ISet>(*this); }
 };
 
-class Number : public ISet {
-public:
-    Number(int val) : _val(val) {}
-    Number(std::string const &str) : _val(std::stoi(str)) {}
-    Number operator+(Number const &rhs) const { return _val + rhs._val; }
-    Number operator-(Number const &rhs) const { return _val - rhs._val; }
-    Number operator*(Number const &rhs) const { return _val * rhs._val; }
-    Number operator/(Number const &rhs) const { return _val / rhs._val; }
-    [[nodiscard]] int value() const { return _val; }
-private:
-    int _val;
+template <typename T> struct Base : public ISet {
+    Base(T val, ISet *superset) : val(val), ISet(superset) {}
+
+    template <auto BinOp>
+    [[nodiscard]] std::unique_ptr<ISet> binOp(ISet const &set, ISet *newSuperset = nullptr) const {
+        if (superset != set.superset) return nullptr;
+        auto res = BinOp(val, set.cast<Base<T>>().val);
+        return std::make_unique<Base<decltype(res)>>(res, newSuperset ? newSuperset : superset);
+    }
+
+    [[nodiscard]] std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const override {
+        return binOp<[](auto lhs, auto rhs) { return lhs == rhs; }>(set, super);
+    }
+
+    [[nodiscard]] std::unique_ptr<ISet> operator+(ISet const &set) const override {
+        return binOp<[](auto lhs, auto rhs) { return lhs + rhs; }>(set);
+    }
+
+    [[nodiscard]] std::unique_ptr<ISet> operator-(ISet const &set) const override {
+        return binOp<[](auto lhs, auto rhs) { return lhs - rhs; }>(set);
+    }
+
+    [[nodiscard]] std::unique_ptr<ISet> operator*(ISet const &set) const override {
+        return binOp<[](auto lhs, auto rhs) { return lhs * rhs; }>(set);
+    }
+
+    [[nodiscard]] std::unique_ptr<ISet> operator/(ISet const &set) const override {
+        return binOp<[](auto lhs, auto rhs) { return lhs / rhs; }>(set);
+    }
+
+    [[nodiscard]] std::string show() const override {
+        if constexpr (std::is_same_v<bool, decltype(val)>) {
+            return val ? "true" : "false";
+        }
+        return std::to_string(val);
+    }
+
+    [[nodiscard]] std::unique_ptr<ISet> clone() const override { return std::make_unique<Base<T>>(*this); }
+
+protected:
+    T val;
 };
+
+using Bool = Base<bool>;
+using Int = Base<int>;
+
+struct Identity : public ISet {
+    Identity() : ISet(nullptr) {}
+    [[nodiscard]] std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const override {
+        (void)super;
+        return std::make_unique<Bool>(this == &set, superset);
+    }
+};
+
+struct Sets : ISet, std::map<std::string, std::unique_ptr<ISet>> {
+    Sets(node::Module const *module = nullptr, ISet *superset = nullptr) : ISet(superset), module(module) {}
+    node::Module const *module;
+};
+
 struct Module : public ISet {
-    Module(std::string name) : name(std::move(name)) {}
+    Module(std::string name) : ISet(nullptr), name(std::move(name)) {}
     std::string name;
     std::multimap<std::string, node::Fact *> facts;
     set::Module operator+(set::Module const &rhs) const {
@@ -35,10 +98,6 @@ struct Module : public ISet {
         facts.erase(lhs);
         return facts.empty();
     }
-};
-struct Sets : ISet, std::map<std::string, std::unique_ptr<ISet>> {
-    Sets(node::Module const *module = nullptr) : module(module) {}
-    node::Module const *module;
 };
 
 } // namespace set

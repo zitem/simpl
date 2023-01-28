@@ -18,6 +18,7 @@ std::vector<std::unique_ptr<Module>> all() {
         module->setName(name);
         res.push_back(std::move(module));
     };
+    push(std::make_unique<Eq>());
     push(std::make_unique<Add>());
     push(std::make_unique<Sub>());
     push(std::make_unique<Mul>());
@@ -35,13 +36,22 @@ std::map<std::string, Module *> genMap(std::vector<std::unique_ptr<Module>> cons
 
 BuiltinFact::BuiltinFact(std::string name) : Fact(std::make_unique<Set>("extract"), nullptr), name(std::move(name)) {}
 
+Eq::Eq() : BuiltinFact("Eq") {}
+std::unique_ptr<set::ISet> Eq::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top()->cast<set::Sets>();
+    auto const &x = facts.at("x");
+    auto const &y = facts.at("y");
+    if (!x || !y) return nullptr;
+    return x->equal(*y, ctx.sets.at("bool").get());
+}
+
 Add::Add() : BuiltinFact("Add") {}
 std::unique_ptr<set::ISet> Add::solve(Context &ctx) const {
     auto const &facts = ctx.params.top()->cast<set::Sets>();
     auto const &x = facts.at("x");
     auto const &y = facts.at("y");
     if (!x || !y) return nullptr;
-    return std::make_unique<set::Number>(x->cast<set::Number>() + y->cast<set::Number>());
+    return *x + *y;
 }
 
 Sub::Sub() : BuiltinFact("Sub") {}
@@ -50,7 +60,7 @@ std::unique_ptr<set::ISet> Sub::solve(Context &ctx) const {
     auto const &x = facts.at("x");
     auto const &y = facts.at("y");
     if (!x || !y) return nullptr;
-    return std::make_unique<set::Number>(x->cast<set::Number>() - y->cast<set::Number>());
+    return *x - *y;
 }
 
 Mul::Mul() : BuiltinFact("Mul") {}
@@ -59,9 +69,7 @@ std::unique_ptr<set::ISet> Mul::solve(Context &ctx) const {
     auto const &x = facts.at("x");
     auto const &y = facts.at("y");
     if (!x || !y) return nullptr;
-    auto lhs = x->cast<set::Number>().value();
-    auto rhs = y->cast<set::Number>().value();
-    return std::make_unique<set::Number>(x->cast<set::Number>() * y->cast<set::Number>());
+    return *x * *y;
 }
 
 Div::Div() : BuiltinFact("Div") {}
@@ -70,7 +78,7 @@ std::unique_ptr<set::ISet> Div::solve(Context &ctx) const {
     auto const &x = facts.at("x");
     auto const &y = facts.at("y");
     if (!x || !y) return nullptr;
-    return std::make_unique<set::Number>(x->cast<set::Number>() / y->cast<set::Number>());
+    return *x / *y;
 }
 
 } // namespace builtinModules

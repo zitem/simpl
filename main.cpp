@@ -44,7 +44,13 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
 
     case Kind::Fact:
         switch (get(0)->kind.value()) {
-        case Kind::Id: return std::make_unique<Fact>(genAst(nonterm(0), ctx), genAst(nonterm(1), ctx));
+        case Kind::Id: {
+            auto lhs = genAst(nonterm(0), ctx);
+            if (auto ann = genAst(nonterm(1), ctx)) {
+                lhs->cast<Set>().setAnnotation(std::move(ann));
+            }
+            return std::make_unique<Fact>(std::move(lhs), genAst(nonterm(2), ctx));
+        }
         case Kind::Module: {
             auto module = std::make_unique<Module>();
             ctx.currentModule.push(module.get());
@@ -98,6 +104,8 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
             );
         case Kind::Dot: return std::make_unique<Expression>(genAst(nonterm(1), ctx), std::make_unique<Module>());
         }
+
+    case Kind::Annot: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
 
     case Kind::Id: return std::make_unique<Set>(self.view, ctx.currentModule.top());
 

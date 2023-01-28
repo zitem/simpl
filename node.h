@@ -80,6 +80,7 @@ struct Kind {
         RtoL,
         Atom,
         IModule,
+        Annot,
 
         GRoot,
         GFact,
@@ -140,7 +141,9 @@ struct Nonterm : Token {
 
 struct Set : Token {
     Module *parent{};
+    std::unique_ptr<Set> annotation;
     Set(std::string_view view, Module *parent = nullptr);
+    void setAnnotation(std::unique_ptr<Token> &&set);
     [[nodiscard]] std::string value() const { return std::string(view); }
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     void print(size_t indent = 0) const override;

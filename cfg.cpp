@@ -95,6 +95,7 @@ std::vector<std::shared_ptr<Base>> const bnfSymbols{
     std::make_shared<StrFixed>("IModule", Kind::IModule),
     std::make_shared<StrFixed>("Set", Kind::Set),
     std::make_shared<StrFixed>("Extract", Kind::Extract),
+    std::make_shared<StrFixed>("Annot", Kind::Annot),
 };
 
 Parser::CFG const cfgcfg{
@@ -159,6 +160,7 @@ Parser::CFG const cfgcfg{
          {Kind::IModule},
          {Kind::Set},
          {Kind::Extract},
+         {Kind::Annot},
 }}};
 
 void LangCFG::test() {

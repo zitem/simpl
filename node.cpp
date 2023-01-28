@@ -87,6 +87,7 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {    "RtoL",               "RtoL"},
     {    "Atom",               "Atom"},
     { "IModule",            "IModule"},
+    {   "Annot",              "Annot"},
 
     {   "GRoot",              "GRoot"},
     {   "GFact",              "GFact"},
@@ -259,6 +260,10 @@ void Nonterm::pushArgs(std::vector<std::unique_ptr<Token>> tokens) {
 };
 
 Set::Set(std::string_view view, Module *parent) : Token(Kind::Atom, view), parent(parent) {}
+
+void Set::setAnnotation(std::unique_ptr<Token> &&set) {
+    annotation.reset(&set.release()->cast<Set>());
+}
 
 Int::Int(std::string_view view) : Token(Kind::Number, view) {}
 

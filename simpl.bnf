@@ -9,7 +9,7 @@ Stmt'   ::= epsilon
         <$>
 
 Fact    ::= epsilon
-        <+> Id Fact'
+        <+> Id Annot Fact'
         <+> module Id { Stmt }
         <$>
 
@@ -28,6 +28,10 @@ Expr'   ::= Id Extract
 Extract ::= epsilon
         <+> ( Stmt ) . Id
         <+> . Id
+        <$>
+
+Annot   ::= epsilon
+        <+> : Id
         <$>
 
 LtoR    ::= epsilon

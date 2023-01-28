@@ -58,7 +58,7 @@ void Parser::_pop() {
         for (auto const &t : tmp | std::views::reverse) {
             Diagn(), t->show(), " ";
         }
-        static_cast<Nonterm *>(stack.top().get())->pushArgs(std::move(tmp));
+        stack.top()->cast<Nonterm>().pushArgs(std::move(tmp));
         _cst.push(std::move(stack.top()));
         Diagn(), '\n';
         stack.pop();
@@ -335,11 +335,8 @@ void Parser::_dump(std::map<Kind, std::set<FoKind>> const &fo) const {
 }
 
 void Parser::_dump(std::stack<Process> const &stack) {
-    // constexpr auto underline = "\033[4m";
-    // constexpr auto reset = "\033[0m";
     Diagn(), " ";
-    for (auto const &[k, s] : stack._Get_container() /*| std::views::reverse*/) {
-        // Diagn(), (p ? underline : "") , k.show() , reset , " ";
+    for (auto const &[k, s] : stack._Get_container()) {
         Diagn(), k.show(), (s.empty() ? "" : ('(' + s.top()->show() + ')')), " ";
     }
     Diagn(), "\n";

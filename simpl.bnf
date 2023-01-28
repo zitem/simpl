@@ -9,7 +9,7 @@ Stmt'   ::= epsilon
         <$>
 
 Fact    ::= epsilon
-        <+> Expr Fact'
+        <+> Id Fact'
         <+> module Id { Stmt }
         <$>
 
@@ -17,23 +17,26 @@ Fact'   ::= epsilon
         <+> = Expr
         <$>
 
-Expr    ::= RtoL Atom IModule LtoR
-        <+> Atom IModule LtoR
+Expr    ::= RtoL Expr' LtoR
+        <+> Expr' LtoR
+        <$>
+
+Expr'   ::= Id Extract
+        <+> Number
+        <$>
+
+Extract ::= epsilon
+        <+> ( Stmt ) . Id
+        <+> . Id
         <$>
 
 LtoR    ::= epsilon
-        <+> Binary Atom LtoR
+        <+> Binary Expr' LtoR
         <$>
 
-IModule ::= epsilon
-        <+> ( Stmt )
+RtoL    ::= !
+        <+> -
         <$>
-
-RtoL    ::= Unary <$>
-
-Unary   ::= ! <+> - <$>
 
 Binary  ::= + <+> - <+> * <+> / <+> > <+> >= <+> < <+> <=
-        <+> == <+> != <+> | <+> || <+> & <+> && <+> . <$>
-
-Atom    ::= Id <+> Number <$>
+        <+> == <+> != <+> | <+> || <+> & <+> && <$>

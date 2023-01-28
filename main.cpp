@@ -44,7 +44,7 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
 
     case Kind::Fact:
         switch (get(0)->kind.value()) {
-        case Kind::Expr: return std::make_unique<Fact>(genAst(nonterm(0), ctx), genAst(nonterm(1), ctx));
+        case Kind::Id: return std::make_unique<Fact>(genAst(nonterm(0), ctx), genAst(nonterm(1), ctx));
         case Kind::Module: {
             auto module = std::make_unique<Module>();
             ctx.currentModule.push(module.get());
@@ -62,39 +62,44 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
 
     case Kind::Expr: {
         auto hasR2L = get(0)->kind == Kind::RtoL;
-        auto atom = genAst(nonterm(hasR2L ? 1 : 0), ctx);
-        auto modu = genAst(nonterm(hasR2L ? 2 : 1), ctx);
-        auto ltor = genAst(nonterm(hasR2L ? 3 : 2), ctx);
-        std::unique_ptr<Token> lhs;
-        if (modu) {
-            auto &ref = modu->cast<Module>();
-            ref.setName(atom->view);
-            lhs = std::move(modu);
-        } else {
-            lhs = std::move(atom);
-        }
+        auto expr = genAst(nonterm(hasR2L ? 1 : 0), ctx);
+        auto ltor = genAst(nonterm(hasR2L ? 2 : 1), ctx);
         if (!ltor) {
-            return lhs;
+            return expr;
         }
-        return std::make_unique<Expression>(std::move(ltor), std::move(lhs));
+        return std::make_unique<Expression>(std::move(ltor), std::move(expr));
     }
+
+    case Kind::Exp_:
+        if (get(0)->kind == Kind::Id) {
+            if (auto expr = genAst(nonterm(1), ctx)) {
+                expr->cast<Expression>().module->cast<Module>().setName(nonterm(0).view);
+                return expr;
+            }
+        }
+        return genAst(nonterm(0), ctx);
 
     case Kind::LtoR: {
         if (get(0)->kind == Kind::Epsilon) return nullptr;
-        std::unique_ptr<Token> atom = genAst(nonterm(1), ctx); // TODO
+        auto expr = genAst(nonterm(1), ctx);
         auto ltor = genAst(nonterm(2), ctx);
-        if (!ltor) return atom;
-        auto expr = std::make_unique<Expression>(std::move(ltor), std::move(atom));
-        return expr;
+        if (!ltor) return expr;
+        // TODO: support operator
+        return std::make_unique<Expression>(std::move(ltor), std::move(expr));
     }
 
-    case Kind::IModule:
-        if (get(0)->kind == Kind::Epsilon) return nullptr;
-        return std::make_unique<Module>(genAst(nonterm(1), ctx), self.view);
+    case Kind::Extract:
+        switch (get(0)->kind.value()) {
+        case Kind::Epsilon: return nullptr;
+        case Kind::OpenParenthesis:
+            return std::make_unique<Expression>(
+                genAst(nonterm(4), ctx), // extract
+                std::make_unique<Module>(genAst(nonterm(1), ctx), self.view)
+            );
+        case Kind::Dot: return std::make_unique<Expression>(genAst(nonterm(1), ctx), std::make_unique<Module>());
+        }
 
-    case Kind::Atom: return genAst(nonterm(0), ctx);
-
-    case Kind::Id: return std::make_unique<Atom>(self.view, ctx.currentModule.top());
+    case Kind::Id: return std::make_unique<Set>(self.view, ctx.currentModule.top());
 
     case Kind::Number: return std::make_unique<Int>(self.view);
 
@@ -173,12 +178,13 @@ void run(char const *filename) {
     Context ctx(str);
     auto ast = genAst(parser.getCST()._Get_container().front()->cast<Nonterm>(), ctx);
     // ast->print();
+    // std::cout << std::flush;
 
     auto &root = ast->cast<Module>();
     root.setName(filename2module(filename));
     ctx.modules[root.getName()] = &root;
     ctx.params.push(std::make_unique<set::Sets>(&root));
-    auto expr = Expression(std::make_unique<Atom>("main"), std::move(ast));
+    auto expr = Expression(std::make_unique<Set>("main"), std::move(ast));
     auto solved = expr.solve(ctx);
 
     if (solved) {

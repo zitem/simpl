@@ -33,7 +33,7 @@ std::map<std::string, Module *> genMap(std::vector<std::unique_ptr<Module>> cons
     return res;
 }
 
-BuiltinFact::BuiltinFact(std::string name) : Fact(std::make_unique<Atom>("extract"), nullptr), name(std::move(name)) {}
+BuiltinFact::BuiltinFact(std::string name) : Fact(std::make_unique<Set>("extract"), nullptr), name(std::move(name)) {}
 
 Add::Add() : BuiltinFact("Add") {}
 std::unique_ptr<set::ISet> Add::solve(Context &ctx) const {

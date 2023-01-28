@@ -82,6 +82,7 @@ std::vector<std::shared_ptr<Base>> const bnfSymbols{
     std::make_shared<StrFixed>("Stmt", Kind::Stmt),
     std::make_shared<StrFixed>("Stmt'", Kind::Stm_),
     std::make_shared<StrFixed>("Expr", Kind::Expr),
+    std::make_shared<StrFixed>("Expr'", Kind::Exp_),
     std::make_shared<StrFixed>("Fact", Kind::Fact),
     std::make_shared<StrFixed>("Fact'", Kind::Fac_),
     std::make_shared<StrFixed>("Unary", Kind::Unary),
@@ -91,7 +92,10 @@ std::vector<std::shared_ptr<Base>> const bnfSymbols{
     std::make_shared<StrFixed>("Number", Kind::Number),
     std::make_shared<StrFixed>("Id", Kind::Id),
     std::make_shared<StrFixed>("Atom", Kind::Atom),
-    std::make_shared<StrFixed>("IModule", Kind::IModule)};
+    std::make_shared<StrFixed>("IModule", Kind::IModule),
+    std::make_shared<StrFixed>("Set", Kind::Set),
+    std::make_shared<StrFixed>("Extract", Kind::Extract),
+};
 
 Parser::CFG const cfgcfg{
     {Kind::GRoot, {{Kind::GFact, Kind::ChevronsEnd, Kind::GRoot}, {Kind::GEpsilon}}},
@@ -142,6 +146,7 @@ Parser::CFG const cfgcfg{
          {Kind::Stmt},
          {Kind::Stm_},
          {Kind::Expr},
+         {Kind::Exp_},
          {Kind::Fact},
          {Kind::Fac_},
          {Kind::Unary},
@@ -152,6 +157,8 @@ Parser::CFG const cfgcfg{
          {Kind::Id},
          {Kind::Atom},
          {Kind::IModule},
+         {Kind::Set},
+         {Kind::Extract},
 }}};
 
 void LangCFG::test() {

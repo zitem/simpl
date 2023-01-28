@@ -51,6 +51,8 @@ struct Kind {
         ChevronsOr,
         ChevronsEnd,
         Module,
+        Set,
+        Extract,
 
         Epsilon,
         Eof,
@@ -136,9 +138,9 @@ struct Nonterm : Token {
     void print(size_t indent = 0) const override;
 };
 
-struct Atom : Token {
+struct Set : Token {
     Module *parent{};
-    Atom(std::string_view view, Module *parent = nullptr);
+    Set(std::string_view view, Module *parent = nullptr);
     [[nodiscard]] std::string value() const { return std::string(view); }
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     void print(size_t indent = 0) const override;

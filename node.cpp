@@ -58,6 +58,8 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {     "<+>",         "ChevronsOr"},
     {     "<$>",        "ChevronsEnd"},
     {  "module",             "module"},
+    {     "set",                "set"},
+    { "extract",            "extract"},
 
     {      "ε",            "Epsilon"},
     {       "$",                "Eof"},
@@ -154,7 +156,7 @@ void Node::printCode(std::string const &file) const {
     std::cout << std::flush;
 }
 
-std::unique_ptr<set::ISet> Atom::solve(Context &ctx) const {
+std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     auto &params = ctx.params.top()->cast<set::Sets>();
     auto setsfind = params.find(str());
     if (setsfind != params.end()) {
@@ -256,7 +258,7 @@ void Nonterm::pushArgs(std::vector<std::unique_ptr<Token>> tokens) {
     args = std::move(tokens);
 };
 
-Atom::Atom(std::string_view view, Module *parent) : Token(Kind::Atom, view), parent(parent) {}
+Set::Set(std::string_view view, Module *parent) : Token(Kind::Atom, view), parent(parent) {}
 
 Int::Int(std::string_view view) : Token(Kind::Number, view) {}
 
@@ -317,7 +319,7 @@ void Nonterm::print(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "nonterm\n";
 }
 
-void Atom::print(size_t indent) const {
+void Set::print(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << view << "\n";
 }
 

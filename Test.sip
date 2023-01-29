@@ -1,5 +1,5 @@
 // module Test
-main = Eq(x = b, y = b).extract,
+main: bool = Eq(x = b, y = b).extract,
 b = false,
 
 n27 = Arithmetic(lhs = three, rhs = nine).mul,

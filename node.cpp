@@ -162,12 +162,24 @@ void Node::printCode(std::string const &file) const {
 
 std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     auto &params = ctx.params.top()->cast<set::Sets>();
-    auto setsfind = params.find(str());
-    if (setsfind != params.end()) {
-        if (!setsfind->second) {
-            return nullptr;
+    {
+        auto setsfind = params.find(str());
+        if (setsfind != params.end()) {
+            if (!setsfind->second) {
+                return nullptr;
+            }
+            return setsfind->second->clone();
+            // return std::make_unique<set::Ref>(setsfind->second.get());
         }
-        return setsfind->second->clone();
+    }
+    {
+        auto setsfind = ctx.sets.find(str());
+        if (setsfind != ctx.sets.end()) {
+            if (!setsfind->second) {
+                return nullptr;
+            }
+            return std::make_unique<set::Ref>(setsfind->second.get());
+        }
     }
     auto facts = params.module->getFacts();
     auto factFind = facts.facts.equal_range(str());
@@ -221,7 +233,16 @@ std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
 
 std::unique_ptr<set::ISet> Fact::solve(Context &ctx) const {
     if (!rhs) return nullptr;
-    return rhs->solve(ctx);
+    auto rsolve = rhs->solve(ctx);
+    auto const &lannot = lhs->cast<Set>().annotation;
+    if (lannot && rsolve) {
+        auto ssolve = lannot->solve(ctx);
+        auto sameSuper = ssolve->equal(*rsolve->superset(), ctx.sets.at("bool").get());
+        if (!sameSuper->cast<set::Bool>().value()) {
+            return nullptr;
+        }
+    }
+    return rsolve;
 }
 
 set::Module Module::getFacts() const {

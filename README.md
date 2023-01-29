@@ -7,7 +7,9 @@ A programming language
 Main.sip
 
 ``` simpl
-main = Add(x = two, y = four).extract,
+main: annotation = six, annotation = int, // main: int = six
+
+six = Add(x = two, y = four).extract,
 two = Unary(val = 1).succ,
 four = Unary(val = 2).square,
 

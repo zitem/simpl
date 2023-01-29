@@ -200,7 +200,7 @@ std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     if (solved) {
         return solved;
     }
-    Quiet<style::red>(), "undefined extract '", view, "'\n";
+    Quiet<style::yellow>(), "undefined extract '", view, "'\n";
     printCode(ctx.file);
     std::cout << std::flush;
     return nullptr;
@@ -237,7 +237,8 @@ std::unique_ptr<set::ISet> Fact::solve(Context &ctx) const {
     auto const &lannot = lhs->cast<Set>().annotation;
     if (lannot && rsolve) {
         auto ssolve = lannot->solve(ctx);
-        auto sameSuper = ssolve->equal(*rsolve->superset(), ctx.sets.at("bool").get());
+        if (!ssolve) return nullptr;
+        auto sameSuper = ssolve->contains(*rsolve, ctx.sets.at("bool").get());
         if (!sameSuper->cast<set::Bool>().value()) {
             return nullptr;
         }

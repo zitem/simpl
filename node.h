@@ -219,7 +219,7 @@ private:
 struct Context {
     Context(std::string const &file);
     std::map<std::string, node::Module *> modules;
-    std::map<std::string, std::unique_ptr<set::ISet>> sets;
+    set::Sets sets;
     std::stack<node::Module *> currentModule;
     std::stack<std::unique_ptr<set::Sets>> params;
     std::string const &file;

@@ -4,6 +4,7 @@ namespace node {
 struct Fact;
 class Module;
 } // namespace node
+ 
 namespace set {
 
 class ISet {
@@ -11,20 +12,27 @@ public:
     ISet(ISet *superset) : pointer(superset) {}
     virtual ~ISet() = default;
     [[nodiscard]] virtual size_t range() const { return 0; }
-    // [[nodiscard]] virtual std::unique_ptr<ISet> belongs(ISet const &set) const { return set == *superset; }
+    [[nodiscard]] virtual std::string show() const { return "interface"; }
+    [[nodiscard]] virtual std::unique_ptr<ISet> clone() const { return std::make_unique<ISet>(*this); }
+    [[nodiscard]] virtual ISet *superset() const { return pointer; }
+    [[nodiscard]] virtual ISet *thisset() const { return pointer; }
+
     [[nodiscard]] virtual std::unique_ptr<ISet> operator+(ISet const &set) const { return (void)set, nullptr; }
     [[nodiscard]] virtual std::unique_ptr<ISet> operator-(ISet const &set) const { return (void)set, nullptr; }
     [[nodiscard]] virtual std::unique_ptr<ISet> operator*(ISet const &set) const { return (void)set, nullptr; }
     [[nodiscard]] virtual std::unique_ptr<ISet> operator/(ISet const &set) const { return (void)set, nullptr; }
     [[nodiscard]] virtual std::unique_ptr<ISet> operator|(ISet const &set) const { return (void)set, nullptr; }
+
+    // [[nodiscard]] virtual std::unique_ptr<ISet> belongs(ISet const &set, ISet *super) const;
+    [[nodiscard]] virtual std::unique_ptr<ISet> contains(ISet const &set, ISet *super) const {
+        return equal(*set.superset(), super);
+    }
     [[nodiscard]] virtual std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const {
         return (void)set, (void)super, nullptr;
     }
-    [[nodiscard]] virtual std::string show() const { return "interface"; }
+
     template <typename T> [[nodiscard]] T &cast() { return *static_cast<T *>(this); }
     template <typename T> [[nodiscard]] T const &cast() const { return *static_cast<T const *>(this); }
-    [[nodiscard]] virtual std::unique_ptr<ISet> clone() const { return std::make_unique<ISet>(*this); }
-    [[nodiscard]] virtual ISet *superset() const { return pointer; }
 protected:
     ISet *pointer{};
 };
@@ -99,8 +107,16 @@ struct Ref : ISet {
     [[nodiscard]] std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const override {
         return pointer->equal(set, super);
     }
+    [[nodiscard]] ISet *thisset() const override { return pointer; }
     [[nodiscard]] ISet *superset() const override { return pointer->superset(); }
     [[nodiscard]] std::string show() const override { return pointer->show(); }
+};
+
+struct Universe : ISet {
+    Universe() : ISet(nullptr) {}
+    std::unique_ptr<ISet> contains(const ISet &set, ISet *super) const override {
+        return (void)set, std::make_unique<Bool>(true, super);
+    }
 };
 
 struct Module : public ISet {

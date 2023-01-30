@@ -20,6 +20,7 @@ std::vector<std::unique_ptr<node::Module>> all() {
     push(std::make_unique<If>());
     push(std::make_unique<Else>());
     push(std::make_unique<Not>());
+    push(std::make_unique<Neg>());
     push(std::make_unique<Eq>());
     push(std::make_unique<Noteq>());
     push(std::make_unique<Add>());
@@ -81,6 +82,14 @@ std::unique_ptr<set::ISet> Not::solve(Context &ctx) const {
     auto const &v = facts.at("v");
     if (!v) return nullptr;
     return !*v;
+}
+
+Neg::Neg() : BuiltinFact("Neg") {}
+std::unique_ptr<set::ISet> Neg::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top()->cast<set::Sets>();
+    auto const &v = facts.at("v");
+    if (!v) return nullptr;
+    return -*v;
 }
 
 Eq::Eq() : BuiltinFact("Eq") {}

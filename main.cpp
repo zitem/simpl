@@ -70,10 +70,17 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         auto hasR2L = get(0)->kind == Kind::RtoL;
         auto expr = genAst(nonterm(hasR2L ? 1 : 0), ctx);
         auto ltor = genAst(nonterm(hasR2L ? 2 : 1), ctx);
-        if (!ltor) {
-            return expr;
+        auto res = ltor ? std::make_unique<Expression>(std::move(ltor), std::move(expr)) : std::move(expr);
+        if (hasR2L) {
+            auto exp2 = genAst(nonterm(0), ctx);
+            auto stmt = std::make_unique<Statements>();
+            auto fact = std::make_unique<Fact>(std::make_unique<Set>("v", ctx.currentModule.top()), std::move(res));
+            stmt->pushBack(std::move(fact));
+            auto modu = std::make_unique<Module>(std::move(stmt));
+            modu->setName(nonterm(0).view == "!" ? std::string("Not") : "Neg");
+            res = std::make_unique<Expression>(std::make_unique<Set>("extract"), std::move(modu));
         }
-        return std::make_unique<Expression>(std::move(ltor), std::move(expr));
+        return res;
     }
 
     case Kind::Exp_:

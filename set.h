@@ -18,6 +18,7 @@ struct ISet {
     virtual std::unique_ptr<ISet> operator*(ISet const &set) const = 0;
     virtual std::unique_ptr<ISet> operator/(ISet const &set) const = 0;
     virtual std::unique_ptr<ISet> operator!() const = 0;
+    virtual std::unique_ptr<ISet> operator-() const = 0;
 
     virtual std::unique_ptr<ISet> lt(ISet const &set, ISet *boolSet) const = 0;
     virtual std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const = 0;
@@ -82,6 +83,14 @@ public:
             return std::make_unique<Base<bool>>(!_val, _superset);
         } else {
             return nullptr;
+        }
+    }
+
+    std::unique_ptr<ISet> operator-() const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return std::make_unique<Base<T>>(-_val, _superset);
         }
     }
 
@@ -167,6 +176,7 @@ struct Identity : ISet {
     std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator!() const override { return nullptr; }
+    std::unique_ptr<ISet> operator-() const override { return nullptr; }
 
     std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
@@ -201,6 +211,7 @@ public:
     std::unique_ptr<ISet> operator*(ISet const &set) const override { return _set * set; }
     std::unique_ptr<ISet> operator/(ISet const &set) const override { return _set / set; }
     std::unique_ptr<ISet> operator!() const override { return !_set; }
+    std::unique_ptr<ISet> operator-() const override { return -_set; }
 
     std::unique_ptr<ISet> lt(ISet const &set, ISet *boolSet) const override { return _set.lt(set, boolSet); }
     std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const override { return _set.gt(set, boolSet); }
@@ -229,6 +240,7 @@ struct Universe : ISet {
     std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator!() const override;
+    std::unique_ptr<ISet> operator-() const override { return nullptr; }
 
     std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
@@ -254,6 +266,7 @@ struct Void : ISet {
     std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator!() const override { return std::make_unique<Universe>(); }
+    std::unique_ptr<ISet> operator-() const override { return nullptr; }
 
     std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
@@ -282,6 +295,7 @@ public:
     std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
     std::unique_ptr<ISet> operator!() const override { return nullptr; }
+    std::unique_ptr<ISet> operator-() const override { return nullptr; }
 
     std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }

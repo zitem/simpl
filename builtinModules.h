@@ -32,6 +32,11 @@ struct Not : BuiltinFact {
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
+struct Neg : BuiltinFact {
+    Neg();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
 struct Eq: BuiltinFact {
     Eq();
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;

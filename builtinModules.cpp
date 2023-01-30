@@ -4,15 +4,11 @@ namespace builtinModules {
 
 std::vector<std::unique_ptr<node::Module>> all() {
     std::vector<std::unique_ptr<node::Module>> res;
-    struct BuiltinModule : node::Module {
-        using Module::Module;
-        [[nodiscard]] Node combine(Node const &tail) const override { return tail; }
-    };
     auto push = [&res](auto ptr) {
         auto stmt = std::make_unique<node::Statements>();
         auto const &name = ptr->name;
         stmt->pushBack(std::move(ptr));
-        auto module = std::make_unique<BuiltinModule>(std::move(stmt));
+        auto module = std::make_unique<node::Module>(std::move(stmt));
         module->setName(name);
         res.push_back(std::move(module));
     };

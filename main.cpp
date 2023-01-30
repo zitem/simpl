@@ -30,23 +30,14 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
 
     switch (self.kind.value()) {
 
-    case Kind::Root: {
-        auto module = std::make_unique<Module>();
-        ctx.currentModule.push(module.get());
-        auto stmt = genAst(nonterm(0), ctx);
-        module->stmts.reset(&stmt.release()->cast<Statements>());
-        module->view = self.view;
-        ctx.currentModule.pop();
-        return module;
-    }
+    case Kind::Root: return std::make_unique<Module>(genAst(nonterm(0), ctx), self.view);
 
     case Kind::Stmt: {
         if (auto stmt = genAst(nonterm(1), ctx)) {
             stmt->cast<Statements>().pushFront(genAst(nonterm(0), ctx));
             return stmt;
         }
-        auto stmt = std::make_unique<Statements>();
-        stmt->pushFront(genAst(nonterm(0), ctx));
+        auto stmt = std::make_unique<Statements>(genAst(nonterm(0), ctx));
         return stmt;
     }
 
@@ -56,27 +47,22 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
             stmt->cast<Statements>().pushFront(genAst(nonterm(1), ctx));
             return stmt;
         }
-        auto stmt = std::make_unique<Statements>();
-        stmt->pushFront(genAst(nonterm(1), ctx));
-        return stmt;
+        return std::make_unique<Statements>(genAst(nonterm(1), ctx));
     }
 
     case Kind::Fact:
         switch (get(0)->kind.value()) {
         case Kind::Id: {
-            auto lhs = genAst(nonterm(0), ctx);
-            if (auto ann = genAst(nonterm(1), ctx)) {
-                lhs->cast<Set>().setSuperset(std::move(ann));
+            auto lvalue = genAst(nonterm(0), ctx);
+            if (auto annot = genAst(nonterm(1), ctx)) {
+                lvalue->cast<Set>().setSuperset(std::move(annot));
             }
-            return std::make_unique<Fact>(std::move(lhs), genAst(nonterm(2), ctx));
+            return std::make_unique<Fact>(std::move(lvalue), genAst(nonterm(2), ctx));
         }
         case Kind::Module: {
-            auto module = std::make_unique<Module>();
-            ctx.currentModule.push(module.get());
-            auto stmt = genAst(nonterm(3), ctx);
-            ctx.currentModule.pop();
-            module->stmts.reset(&stmt.release()->cast<Statements>());
-            module->setName(nonterm(1).view);
+            auto module = std::make_unique<Module>(
+                genAst(nonterm(3), ctx), get(0)->combine(*get(4)), std::string(nonterm(1).view)
+            );
             ctx.modules[module->getName()] = module.get();
             return module;
         }
@@ -91,14 +77,13 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         auto ltor = genAst(nonterm(hasR2L ? 2 : 1), ctx);
         auto res = std::move(expr);
         if (hasR2L) {
-            auto factV = std::make_unique<Fact>(std::make_unique<Set>("v", ctx.currentModule.top()), std::move(res));
-            res = genAst(nonterm(0), ctx);
-            res->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factV));
+            auto exp = genAst(nonterm(0), ctx);
+            exp->cast<Expression>().pushParam(std::make_unique<Set>("v"), std::move(res));
+            res = std::move(exp);
         }
         if (ltor) {
-            auto factY = std::make_unique<Fact>(std::make_unique<Set>("x", ctx.currentModule.top()), std::move(res));
+            ltor->cast<Expression>().pushParam(std::make_unique<Set>("x"), std::move(res));
             res = std::move(ltor);
-            res->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factY));
         }
         return std::move(res);
     }
@@ -120,14 +105,11 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         auto expr = genAst(nonterm(1), ctx);
         auto right = genAst(nonterm(2), ctx);
         if (!right) {
-            auto factY = std::make_unique<Fact>(std::make_unique<Set>("y", ctx.currentModule.top()), std::move(expr));
-            left->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factY));
+            left->cast<Expression>().pushParam(std::make_unique<Set>("y"), std::move(expr));
             return left;
         }
-        auto factX = std::make_unique<Fact>(std::make_unique<Set>("x", ctx.currentModule.top()), std::move(expr));
-        right->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factX));
-        auto factY = std::make_unique<Fact>(std::make_unique<Set>("y", ctx.currentModule.top()), std::move(right));
-        left->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factY));
+        right->cast<Expression>().pushParam(std::make_unique<Set>("x"), std::move(expr));
+        left->cast<Expression>().pushParam(std::make_unique<Set>("y"), std::move(right));
         return left;
     }
 
@@ -140,15 +122,14 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         case Kind::Epsilon: return nullptr;
         case Kind::OpenParenthesis:
             return std::make_unique<Expression>(
-                genAst(nonterm(4), ctx), // extract
-                std::make_unique<Module>(genAst(nonterm(1), ctx), self.view)
+                genAst(nonterm(4), ctx), std::make_unique<Module>(genAst(nonterm(1), ctx), get(0)->combine(*get(4)))
             );
         case Kind::Dot: return std::make_unique<Expression>(genAst(nonterm(1), ctx), std::make_unique<Module>());
         }
 
     case Kind::Annot: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
 
-    case Kind::Id: return std::make_unique<Set>(self.view, ctx.currentModule.top());
+    case Kind::Id: return std::make_unique<Set>(self.view);
 
     case Kind::Bool: return std::make_unique<Bool>(self.view);
 
@@ -232,7 +213,7 @@ void run(char const *filename) {
 
     Context ctx(str);
     auto ast = genAst(parser.getCST()._Get_container().front()->cast<Nonterm>(), ctx);
-    // ast->print();
+    // ast->dump();
     // std::cout << std::flush;
 
     auto &root = ast->cast<Module>();

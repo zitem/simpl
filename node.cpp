@@ -234,12 +234,12 @@ std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
 }
 
 std::unique_ptr<set::ISet> Fact::solve(Context &ctx) const {
-    if (!rhs) return nullptr;
-    auto rsolve = rhs->solve(ctx);
+    if (!_rvalue) return nullptr;
+    auto rsolve = _rvalue->solve(ctx);
     if (!rsolve) {
         return nullptr;
     }
-    auto const &lannot = lhs->cast<Set>().annotation;
+    auto const &lannot = _lvalue->cast<Set>().getSuperset();
     // default lvalue superset is universe
     auto lsuperset = lannot ? lannot->solve(ctx) : std::make_unique<set::Universe>();
     auto sameSuper = lsuperset->contains(*rsolve, ctx.sets.at("bool").get());
@@ -254,7 +254,7 @@ set::Module Module::getFacts() const {
     for (auto const &s : stmts->cast<Statements>().get()) {
         if (s->kind != Kind::Fact) continue;
         auto &fact = s->cast<Fact>();
-        auto name = std::string(fact.lhs->view);
+        auto name = std::string(fact.lvalue().view);
         m.facts.emplace(name, &fact);
     }
     return m;
@@ -262,10 +262,10 @@ set::Module Module::getFacts() const {
 
 std::unique_ptr<set::ISet> Module::solve(Context &ctx) const {
     auto sets = std::make_unique<set::Sets>();
-    for (auto const &s : stmts->cast<Statements>().get()) {
+    for (auto const &s : stmts->get()) {
         if (s->kind != Kind::Fact) continue;
         auto &fact = s->cast<Fact>();
-        auto name = std::string(fact.lhs->view);
+        auto name = std::string(fact.lvalue().view);
         sets->emplace(name, s->solve(ctx));
     }
     return sets;
@@ -282,19 +282,30 @@ void Nonterm::pushArgs(std::vector<std::unique_ptr<Token>> tokens) {
     args = std::move(tokens);
 };
 
-Set::Set(std::string_view view, Module *parent) : Token(Kind::Atom, view), parent(parent) {}
+Set::Set(std::string_view view, std::unique_ptr<Token> &&annotation)
+    : Token(Kind::Set, view), _annotation(std::move(annotation)) {}
 
 void Set::setSuperset(std::unique_ptr<Token> &&set) {
-    annotation.reset(&set.release()->cast<Set>());
+    _annotation = std::move(set);
+}
+
+Token *Set::getSuperset() {
+    return _annotation.get();
 }
 
 Expression::Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&module)
-    : Token(Kind::Expr, module->combine(*extract)), extract(std::move(extract)), module(std::move(module)) {}
+    : Token(Kind::Expr, module->combine(*extract)),
+      extract(&extract.release()->cast<Set>()),
+      module(&module.release()->cast<Module>()) {}
 
-Fact::Fact(std::unique_ptr<Token> &&lhs, std::unique_ptr<Token> &&rhs)
-    : Token(Kind::Fact, rhs ? lhs->combine(*rhs) : lhs->view), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
+void Expression::pushParam(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue) const {
+    module->stmts->pushBack(std::make_unique<Fact>(std::move(lvalue), std::move(rvalue)));
+}
 
-Statements::Statements() : Token(Kind::Stmt, {}) {}
+Fact::Fact(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue)
+    : Token(Kind::Fact, rvalue ? lvalue->combine(*rvalue) : lvalue->view),
+      _lvalue(&lvalue.release()->cast<Set>()),
+      _rvalue(std::move(rvalue)) {}
 
 void Statements::pushFront(std::unique_ptr<Token> &&stmt) {
     if (!stmt) return;
@@ -308,13 +319,11 @@ void Statements::pushBack(std::unique_ptr<Token> &&stmt) {
     view = _statements.front()->combine(*_statements.back()).view;
 }
 
-Module::Module(std::unique_ptr<Statements> &&statements) : Module(std::move(statements), Node{{}}) {}
+Module::Module() : Module(std::make_unique<Statements>()) {}
 
-Module::Module(std::unique_ptr<Token> &&statements, Node const &node)
-    : Token(Kind::Module, node), stmts(std::make_unique<Statements>()) {
-    if (statements) {
-        stmts.reset(&statements.release()->cast<Statements>());
-    }
+Module::Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name)
+    : Token(Kind::Module, node), stmts(std::make_unique<Statements>()), _name(std::move(name)) {
+    stmts.reset(&statements.release()->cast<Statements>());
     view = stmts->view;
 }
 
@@ -331,43 +340,37 @@ std::string const &Module::getName() const {
     return _name;
 }
 
-auto Module::find(std::string const &lhs) const -> std::deque<std::unique_ptr<Token>>::const_iterator {
-    return std::find_if(stmts->get().begin(), stmts->get().end(), [&lhs](std::unique_ptr<Token> const &token) {
-        return token->kind == Kind::Fact && token->cast<Fact>().lhs->view == lhs;
-    });
-}
-
-void Token::print(size_t indent) const {
+void Token::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "token\n";
 }
 
-void Nonterm::print(size_t indent) const {
+void Nonterm::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "nonterm\n";
 }
 
-void Set::print(size_t indent) const {
+void Set::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << view << "\n";
 }
 
-void Expression::print(size_t indent) const {
+void Expression::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "expr\n";
-    if (extract) extract->print(indent + 1);
-    if (module) module->print(indent + 1);
+    if (extract) extract->dump(indent + 1);
+    if (module) module->dump(indent + 1);
 }
 
-void Fact::print(size_t indent) const {
+void Fact::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "fact\n";
-    if (lhs) lhs->print(indent + 1);
-    if (rhs) rhs->print(indent + 1);
+    if (_lvalue) _lvalue->dump(indent + 1);
+    if (_rvalue) _rvalue->dump(indent + 1);
 }
 
-void Statements::print(size_t indent) const {
+void Statements::dump(size_t indent) const {
     for (auto const &s : _statements) {
-        s->print(indent);
+        s->dump(indent);
     }
 }
 
-void Module::print(size_t indent) const {
+void Module::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "module " << getName() << "\n";
-    stmts->print(indent + 1);
+    stmts->dump(indent + 1);
 }

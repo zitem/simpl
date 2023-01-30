@@ -53,14 +53,14 @@ void Parser::reset() {
 void Parser::_pop() {
     auto &stack = _stack.top().stack;
     while (!stack.empty()) {
-        auto count = stack.top()->size;
+        auto count = stack.top()->cast<Nonterm>().size;
         std::vector<std::unique_ptr<Token>> tmp;
         for (auto i = 0; i < count; ++i) {
             tmp.push_back(std::move(_cst.top()));
             _cst.pop();
         }
         for (auto const &t : tmp | std::views::reverse) {
-            Diagn(), t->show(), " ";
+            Diagn(), t->kind.show(), " ";
         }
         stack.top()->cast<Nonterm>().pushArgs(std::move(tmp));
         _cst.push(std::move(stack.top()));
@@ -140,7 +140,7 @@ int Parser::parse(Token const &input) {
     }
 
     for (auto const &k : _cst._Get_container()) {
-        Diagn(), k->show(), " ";
+        Diagn(), k->kind.show(), " ";
     }
     Diagn(), "\n";
 
@@ -340,7 +340,7 @@ void Parser::_dump(std::map<Kind, std::set<FoKind>> const &fo) const {
 void Parser::_dump(std::stack<Process> const &stack) {
     Diagn(), " ";
     for (auto const &[k, s] : stack._Get_container()) {
-        Diagn(), k.show(), (s.empty() ? "" : ('(' + s.top()->show() + ')')), " ";
+        Diagn(), k.show(), (s.empty() ? "" : ('(' + s.top()->kind.show() + ')')), " ";
     }
     Diagn(), "\n";
 }

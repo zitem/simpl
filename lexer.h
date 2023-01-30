@@ -31,7 +31,7 @@ struct Base {
     Base(Kind kind) : kind(kind) {}
     Kind kind;
     virtual ~Base() = default;
-    [[nodiscard]] virtual std::string show() const = 0;
+     virtual std::string show() const = 0;
     // suppose all characters of the view have matched except the last, so check the last
     virtual bool match(std::string_view const &view) = 0;
     // suppose all characters of the view have matched, so check is not matched yet
@@ -40,14 +40,14 @@ struct Base {
 
 struct Id : Base {
     using Base::Base;
-    [[nodiscard]] std::string show() const override { return "id"; }
+     std::string show() const override { return "id"; }
     bool match(std::string_view const &view) override { return (view.size() == 1 ? isHead : isBody)(view.back()); }
     bool over(std::string_view const &view) override { return view.size() > 1 && !isBody(view.back()); }
 };
 
 struct Number : Base {
     using Base::Base;
-    [[nodiscard]] std::string show() const override { return "num"; }
+     std::string show() const override { return "num"; }
     bool match(std::string_view const &view) override { return isDigit(view.back()) || view.back() == '.'; }
     bool over(std::string_view const &view) override { return view.size() > 1 && !match(view); }
 };
@@ -55,7 +55,7 @@ struct Number : Base {
 struct StrRegion : Base {
     StrRegion(std::string head, std::string tail, Kind kind)
         : Base(kind), head(std::move(head)), tail(std::move(tail)) {}
-    [[nodiscard]] std::string show() const override { return head + "..." + tail; }
+     std::string show() const override { return head + "..." + tail; }
     bool match(std::string_view const &view) override {
         return view.size() > head.size() || view.back() == head[view.size() - 1];
     }
@@ -67,7 +67,7 @@ struct StrRegion : Base {
 
 struct CharRegion : Base {
     CharRegion(char left, char right, Kind kind) : Base(kind), left(left), right(right) {}
-    [[nodiscard]] std::string show() const override { return std::format("{}...{}", left, right); }
+     std::string show() const override { return std::format("{}...{}", left, right); }
     bool match(std::string_view const &view) override { return view.size() > 1 || view.front() == left; }
     bool over(std::string_view const &view) override { return view.size() > 2 && *(view.rbegin() - 1) == right; }
     char const left;
@@ -76,7 +76,7 @@ struct CharRegion : Base {
 
 struct StrFixed : Base {
     StrFixed(std::string name, Kind kind) : Base(kind), name(std::move(name)) {}
-    [[nodiscard]] std::string show() const override { return name; }
+     std::string show() const override { return name; }
     bool match(std::string_view const &view) override {
         auto size = view.size() - 1;
         return size < name.size() && view.back() == name[size];
@@ -87,7 +87,7 @@ struct StrFixed : Base {
 
 struct CharFixed : Base {
     CharFixed(char name, Kind kind) : Base(kind), name(name) {}
-    [[nodiscard]] std::string show() const override { return {name}; }
+     std::string show() const override { return {name}; }
     bool match(std::string_view const &view) override { return view.back() == name; }
     bool over(std::string_view const &view) override { return view.size() == 2; }
     char const name;
@@ -95,7 +95,7 @@ struct CharFixed : Base {
 
 struct Any : Base {
     using Base::Base;
-    [[nodiscard]] std::string show() const override { return "any"; }
+     std::string show() const override { return "any"; }
     bool match(std::string_view const &view) override { return !isSpace(view.back()); }
     bool over(std::string_view const &view) override { return view.size() > 1 && isSpace(view.back()); }
 };
@@ -106,15 +106,15 @@ class Lexer {
 public:
     Lexer(std::string const &str) : _string(str) {}
 
-    [[nodiscard]] bool empty() const { return _returnedEof > 1; }
+     bool empty() const { return _returnedEof > 1; }
 
     node::Token next(std::vector<std::shared_ptr<token::Base>> const &tokens);
 
 private:
-    [[nodiscard]] char _getNow() const { return _string[_now]; }
-    [[nodiscard]] char _getBegin() const { return _string[_begin]; }
-    [[nodiscard]] int _offset() const { return static_cast<int>(_now - _begin); }
-    [[nodiscard]] std::string_view _view(uint32_t offset = 1) const {
+     char _getNow() const { return _string[_now]; }
+     char _getBegin() const { return _string[_begin]; }
+     int _offset() const { return static_cast<int>(_now - _begin); }
+     std::string_view _view(uint32_t offset = 1) const {
         return {_string.begin() + _begin, _string.begin() + _now + offset};
     }
 

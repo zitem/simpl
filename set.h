@@ -192,7 +192,7 @@ struct Identity : ISet {
 
 class Ref : public ISet {
 public:
-    Ref(ISet const *set) : _set(*set) {}
+    Ref(ISet const *set) : _set(*set->thisset()) {}
     ISet const *thisset() const override { return &_set; }
     ISet const *superset() const override { return _set.superset(); }
 

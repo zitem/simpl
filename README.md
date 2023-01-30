@@ -4,41 +4,32 @@ A programming language
 
 ## Sample
 
-### Main.sip
+### Fibonacci.sip
 
 ``` simpl
-main: annotation = six, annotation = int, // main: int = six
-
-six = Add(x = two, y = four).extract,
-two = Unary(val = 1).succ,
-four = Unary(val = 2).square,
+main: int = Fib(index = 8).res, // result is 21
 
 module Unary {
     succ = Add(x = val, y = 1).extract,
-    square = Mul(x = val, y = val).extract,
+    pred = Sub(x = val, y = 1).extract,
+},
+
+module Fib {
+    index,
+
+    a = 0,
+    b = 1, 
+    c = Add(x = a, y = b).extract,
+
+    run = Gt(x = index, y = 2).extract,
+    if = If(v = run).extract,
+    else = Not(v = if).extract,
+
+    pred: if = Unary(val = index).pred,
+    res = Fib(a = b, b = c, index = pred).res,
+    res: else = c,
 },
 ```
-
-result `` 6 ``
-
-### Another.sip
-
-``` simpl
-main = IsZero(val = 0).res,
-
-module IsZero {
-    is0 = Eq(x = val, y = 0).extract,
-    not0 = Not(v = is0).extract,
-
-    if0 = If(v = is0).extract, // universe
-        res: if0 = true,
-
-    ifX = If(v = not0).extract, // empty set
-        res: ifX = false,
-},
-```
-
-result `` true ``
 
 ## Build
 

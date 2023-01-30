@@ -1,21 +1,22 @@
-// module Test
-main: bool = Eq(x = b, y = b).extract,
-b = false,
-
-n27 = Arithmetic(lhs = three, rhs = nine).mul,
-
-three = Arithmetic(lhs = 1, rhs = 2).add,
-nine = Unary(val = 3).square,
-
-module Arithmetic {
-    lhs,
-    rhs,
-    add = Add(x = lhs, y = rhs).extract,
-    sub = Sub(x = lhs, y = rhs).extract,
-    mul = Mul(x = lhs, y = rhs).extract,
-    div = Div(x = lhs, y = rhs).extract,
-},
+main: int = Fib(index = 8).res, // result is 21
 
 module Unary {
-    square = Mul(x = val, y = val).extract,
+    succ = Add(x = val, y = 1).extract,
+    pred = Sub(x = val, y = 1).extract,
+},
+
+module Fib {
+    index,
+
+    a = 0,
+    b = 1, 
+    c = Add(x = a, y = b).extract,
+
+    run = Gt(x = index, y = 2).extract,
+    if = If(v = run).extract,
+    else = Not(v = if).extract,
+
+    pred: if = Unary(val = index).pred,
+    res = Fib(a = b, b = c, index = pred).res,
+    res: else = c,
 },

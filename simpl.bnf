@@ -32,7 +32,7 @@ Extract ::= epsilon
         <$>
 
 Annot   ::= epsilon
-        <+> : Id
+        <+> : Expr
         <$>
 
 LtoR    ::= epsilon

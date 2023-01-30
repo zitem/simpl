@@ -5,6 +5,25 @@
 
 using namespace node;
 
+template <bool Unary> auto makeExpr(Kind op) {
+    static std::map<Kind, std::string> const TABLE{
+        {      Kind::SinglePlus,                 "Add"},
+        {     Kind::SingleMinus, Unary ? "Neg" : "Sub"},
+        {  Kind::SingleAsterisk,                 "Mul"},
+        {     Kind::SingleSlash,                 "Div"},
+        {        Kind::LessThan,                  "Lt"},
+        {       Kind::GreatThan,                  "Gt"},
+        { Kind::LessThanOrEqual,                "Lteq"},
+        {Kind::GreatThanOrEqual,                "Gteq"},
+        {     Kind::DoubleEqual,                  "Eq"},
+        {Kind::ExclamationEqual,               "Noteq"},
+        {     Kind::Exclamation,                 "Not"},
+    };
+    auto modu = std::make_unique<Module>();
+    modu->setName(TABLE.at(op));
+    return std::make_unique<Expression>(std::make_unique<Set>("extract"), std::move(modu));
+}
+
 std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
     auto get = [&self](auto idx) { return self.args[self.size - 1 - idx].get(); };
     auto nonterm = [&get](auto idx) -> Nonterm & { return get(idx)->template cast<Nonterm>(); };
@@ -70,36 +89,51 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         auto hasR2L = get(0)->kind == Kind::RtoL;
         auto expr = genAst(nonterm(hasR2L ? 1 : 0), ctx);
         auto ltor = genAst(nonterm(hasR2L ? 2 : 1), ctx);
-        auto res = ltor ? std::make_unique<Expression>(std::move(ltor), std::move(expr)) : std::move(expr);
+        auto res = std::move(expr);
         if (hasR2L) {
-            auto exp2 = genAst(nonterm(0), ctx);
-            auto stmt = std::make_unique<Statements>();
-            auto fact = std::make_unique<Fact>(std::make_unique<Set>("v", ctx.currentModule.top()), std::move(res));
-            stmt->pushBack(std::move(fact));
-            auto modu = std::make_unique<Module>(std::move(stmt));
-            modu->setName(nonterm(0).view == "!" ? std::string("Not") : "Neg");
-            res = std::make_unique<Expression>(std::make_unique<Set>("extract"), std::move(modu));
+            auto factV = std::make_unique<Fact>(std::make_unique<Set>("v", ctx.currentModule.top()), std::move(res));
+            res = genAst(nonterm(0), ctx);
+            res->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factV));
         }
-        return res;
+        if (ltor) {
+            auto factY = std::make_unique<Fact>(std::make_unique<Set>("x", ctx.currentModule.top()), std::move(res));
+            res = std::move(ltor);
+            res->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factY));
+        }
+        return std::move(res);
     }
 
     case Kind::Exp_:
-        if (get(0)->kind == Kind::Id) {
+        switch (get(0)->kind.value()) {
+        case Kind::Id:
             if (auto expr = genAst(nonterm(1), ctx)) {
                 expr->cast<Expression>().module->cast<Module>().setName(nonterm(0).view);
                 return expr;
             }
+            return genAst(nonterm(0), ctx);
+        default: return genAst(nonterm(0), ctx);
         }
-        return genAst(nonterm(0), ctx);
 
     case Kind::LtoR: {
         if (get(0)->kind == Kind::Epsilon) return nullptr;
+        auto left = genAst(nonterm(0), ctx);
         auto expr = genAst(nonterm(1), ctx);
-        auto ltor = genAst(nonterm(2), ctx);
-        if (!ltor) return expr;
-        // TODO: support operator
-        return std::make_unique<Expression>(std::move(ltor), std::move(expr));
+        auto right = genAst(nonterm(2), ctx);
+        if (!right) {
+            auto factY = std::make_unique<Fact>(std::make_unique<Set>("y", ctx.currentModule.top()), std::move(expr));
+            left->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factY));
+            return left;
+        }
+        auto factX = std::make_unique<Fact>(std::make_unique<Set>("x", ctx.currentModule.top()), std::move(expr));
+        right->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factX));
+        auto factY = std::make_unique<Fact>(std::make_unique<Set>("y", ctx.currentModule.top()), std::move(right));
+        left->cast<Expression>().module->cast<Module>().stmts->pushBack(std::move(factY));
+        return left;
     }
+
+    case Kind::RtoL: return makeExpr<true>(get(0)->kind.value());
+
+    case Kind::Binary: return makeExpr<false>(get(0)->kind.value());
 
     case Kind::Extract:
         switch (get(0)->kind.value()) {

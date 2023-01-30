@@ -186,6 +186,7 @@ void run(char const *filename) {
     std::stringstream buffer;
     buffer << file.rdbuf();
     auto str = buffer.str();
+    parser.setRawText(str);
 
     Lexer lexer(str);
     auto next = lexer.next(bnf);

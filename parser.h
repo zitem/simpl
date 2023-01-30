@@ -16,6 +16,7 @@ class Parser {
 public:
     using CFG = std::map<Kind, std::vector<std::vector<Kind>>>;
     void setupGramma(CFG cfg, Kind root = Kind::Root, Kind epsilon = Kind::Epsilon);
+    void setRawText(std::string const &str);
     [[nodiscard]] std::stack<std::unique_ptr<node::Token>> const &getCST() const;
     int parse(node::Token const &input);
     void reset();
@@ -50,4 +51,5 @@ private:
     CFG _cfg;
     std::stack<std::unique_ptr<node::Token>> _cst;
     std::stack<Process> _stack;
+    std::string const *_text;
 };

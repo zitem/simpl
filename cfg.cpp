@@ -182,6 +182,7 @@ void LangCFG::test() {
 
     Parser parser;
     parser.setupGramma(cfgcfg, Kind::GRoot, Kind::GEpsilon);
+    parser.setRawText(question);
 
     Lexer lexer(question);
     for (auto next = lexer.next(bnfSymbols); !lexer.empty(); next = lexer.next(bnfSymbols)) {

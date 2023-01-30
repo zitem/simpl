@@ -34,6 +34,10 @@ void Parser::setupGramma(CFG cfg, Kind root, Kind epsilon) {
     Diagn(), '\n';
 }
 
+void Parser::setRawText(std::string const &str) {
+    _text = &str;
+}
+
 std::stack<std::unique_ptr<Token>> const &Parser::getCST() const {
     return _cst;
 }
@@ -123,16 +127,15 @@ int Parser::parse(Token const &input) {
     }
 
     if (err > 0) {
-        Quiet(), style::red;
-        Quiet(), "input is '", input.show(), "' \n";
-        Quiet(), "expected ";
+        Quiet<style::red>(), "expected ";
         if (_isTerm(_stack.top().kind)) {
-            Quiet(), '\'', _stack.top().kind.show(), '\'';
+            Quiet<style::red>(), '\'', _stack.top().kind.show(), '\'';
         }
         for (auto const &ff : _first[_stack.top().kind]) {
-            Quiet(), '\'', ff.first.show(), '\'', ' ';
+            Quiet<style::red>(), '\'', ff.first.show(), '\'', ' ';
         }
-        Quiet(), "\n\n", style::reset;
+        Quiet(), '\n';
+        input.printCode(*_text);
         return err;
     }
 

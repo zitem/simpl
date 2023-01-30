@@ -22,6 +22,11 @@ struct If : BuiltinFact {
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
+struct Else : BuiltinFact {
+    Else();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
 struct Not : BuiltinFact {
     Not();
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
@@ -29,6 +34,11 @@ struct Not : BuiltinFact {
 
 struct Eq: BuiltinFact {
     Eq();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
+struct Noteq: BuiltinFact {
+    Noteq();
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
@@ -49,6 +59,26 @@ struct Mul : BuiltinFact {
 
 struct Div : BuiltinFact {
     Div();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
+struct Lt : BuiltinFact {
+    Lt();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
+struct Gt : BuiltinFact {
+    Gt();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
+struct Lteq : BuiltinFact {
+    Lteq();
+    [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
+struct Gteq : BuiltinFact {
+    Gteq();
     [[nodiscard]] std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 

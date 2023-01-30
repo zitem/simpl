@@ -200,6 +200,8 @@ void run(char const *filename) {
     auto expr = Expression(std::make_unique<Set>("main"), std::move(ast));
     auto solved = expr.solve(ctx);
 
+    // compile to llvm ir here
+
     if (solved) {
         Quiet<style::blue>(), "> ", solved->show(), "\n";
     } else {

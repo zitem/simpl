@@ -4,123 +4,306 @@ namespace node {
 struct Fact;
 class Module;
 } // namespace node
- 
+
 namespace set {
 
-class ISet {
-public:
-    ISet(ISet *superset) : pointer(superset) {}
+struct ISet {
     virtual ~ISet() = default;
-    [[nodiscard]] virtual size_t range() const { return 0; }
-    [[nodiscard]] virtual std::string show() const { return "interface"; }
-    [[nodiscard]] virtual std::unique_ptr<ISet> clone() const { return std::make_unique<ISet>(*this); }
-    [[nodiscard]] virtual ISet *superset() const { return pointer; }
-    [[nodiscard]] virtual ISet *thisset() const { return pointer; }
 
-    [[nodiscard]] virtual std::unique_ptr<ISet> operator+(ISet const &set) const { return (void)set, nullptr; }
-    [[nodiscard]] virtual std::unique_ptr<ISet> operator-(ISet const &set) const { return (void)set, nullptr; }
-    [[nodiscard]] virtual std::unique_ptr<ISet> operator*(ISet const &set) const { return (void)set, nullptr; }
-    [[nodiscard]] virtual std::unique_ptr<ISet> operator/(ISet const &set) const { return (void)set, nullptr; }
-    [[nodiscard]] virtual std::unique_ptr<ISet> operator|(ISet const &set) const { return (void)set, nullptr; }
+    virtual ISet const *thisset() const = 0;
+    virtual ISet const *superset() const = 0;
 
-    // [[nodiscard]] virtual std::unique_ptr<ISet> belongs(ISet const &set, ISet *super) const;
-    [[nodiscard]] virtual std::unique_ptr<ISet> contains(ISet const &set, ISet *super) const {
-        return equal(*set.superset(), super);
-    }
-    [[nodiscard]] virtual std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const {
-        return (void)set, (void)super, nullptr;
-    }
+    virtual std::unique_ptr<ISet> operator+(ISet const &set) const = 0;
+    virtual std::unique_ptr<ISet> operator-(ISet const &set) const = 0;
+    virtual std::unique_ptr<ISet> operator*(ISet const &set) const = 0;
+    virtual std::unique_ptr<ISet> operator/(ISet const &set) const = 0;
+    virtual std::unique_ptr<ISet> operator!() const = 0;
 
-    template <typename T> [[nodiscard]] T &cast() { return *static_cast<T *>(this); }
-    template <typename T> [[nodiscard]] T const &cast() const { return *static_cast<T const *>(this); }
-protected:
-    ISet *pointer{};
+    virtual std::unique_ptr<ISet> lt(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> lteq(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> gteq(ISet const &set, ISet *boolSet) const = 0;
+
+    virtual std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> noteq(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> contains(ISet const &set, ISet *boolSet) const = 0;
+
+    virtual std::unique_ptr<ISet> clone() const = 0;
+    virtual std::string show() const = 0;
+
+    template <typename T> T &cast() { return *static_cast<T *>(this); }
+    template <typename T> T const &cast() const { return *static_cast<T const *>(this); }
 };
 
-template <typename T> struct Base : public ISet {
-    Base(T val, ISet *superset) : val(val), ISet(superset) {}
+template <typename T> class Base : public ISet {
+    constexpr static bool isBool = std::is_same_v<bool, T>;
 
-    template <auto BinOp>
-    [[nodiscard]] std::unique_ptr<ISet> binOp(ISet const &set, ISet *newSuperset = nullptr) const {
-        if (superset() != set.superset()) return nullptr;
-        auto res = BinOp(val, set.cast<Base<T>>().val);
-        return std::make_unique<Base<decltype(res)>>(res, newSuperset ? newSuperset : pointer);
-    }
+public:
+    Base(T val, ISet *superset) : _val(val), _superset(superset) {}
 
-    [[nodiscard]] std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const override {
-        return binOp<[](auto lhs, auto rhs) { return lhs == rhs; }>(set, super);
-    }
+    ISet const *thisset() const override { return this; }
 
-    [[nodiscard]] std::unique_ptr<ISet> operator+(ISet const &set) const override {
-        return binOp<[](auto lhs, auto rhs) { return lhs + rhs; }>(set);
-    }
+    ISet const *superset() const override { return _superset; }
 
-    [[nodiscard]] std::unique_ptr<ISet> operator-(ISet const &set) const override {
-        return binOp<[](auto lhs, auto rhs) { return lhs - rhs; }>(set);
-    }
-
-    [[nodiscard]] std::unique_ptr<ISet> operator*(ISet const &set) const override {
-        return binOp<[](auto lhs, auto rhs) { return lhs * rhs; }>(set);
-    }
-
-    [[nodiscard]] std::unique_ptr<ISet> operator/(ISet const &set) const override {
-        return binOp<[](auto lhs, auto rhs) { return lhs / rhs; }>(set);
-    }
-
-    [[nodiscard]] T const &value() const { return val; }
-
-    [[nodiscard]] std::string show() const override {
-        if constexpr (std::is_same_v<bool, decltype(val)>) {
-            return val ? "true" : "false";
+    std::unique_ptr<ISet> operator+(ISet const &set) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs + rhs; }>(set);
         }
-        return std::to_string(val);
     }
 
-    [[nodiscard]] std::unique_ptr<ISet> clone() const override { return std::make_unique<Base<T>>(*this); }
+    std::unique_ptr<ISet> operator-(ISet const &set) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs - rhs; }>(set);
+        }
+    }
 
-protected:
-    T val;
+    std::unique_ptr<ISet> operator*(ISet const &set) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs * rhs; }>(set);
+        }
+    }
+
+    std::unique_ptr<ISet> operator/(ISet const &set) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs / rhs; }>(set);
+        }
+    }
+
+    std::unique_ptr<ISet> operator!() const override {
+        if constexpr (isBool) {
+            return std::make_unique<Base<bool>>(!_val, _superset);
+        } else {
+            return nullptr;
+        }
+    }
+
+    std::unique_ptr<ISet> lt(ISet const &set, ISet *boolSet) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs < rhs; }>(set, boolSet);
+        }
+    }
+
+    std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs > rhs; }>(set, boolSet);
+        }
+    }
+
+    std::unique_ptr<ISet> lteq(ISet const &set, ISet *boolSet) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs <= rhs; }>(set, boolSet);
+        }
+    }
+
+    std::unique_ptr<ISet> gteq(ISet const &set, ISet *boolSet) const override {
+        if constexpr (isBool) {
+            return nullptr;
+        } else {
+            return _binOp<[](auto lhs, auto rhs) { return lhs >= rhs; }>(set, boolSet);
+        }
+    }
+
+    std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const override {
+        return _binOp<[](auto lhs, auto rhs) { return lhs == rhs; }>(set, boolSet);
+    }
+
+    std::unique_ptr<ISet> noteq(ISet const &set, ISet *boolSet) const override {
+        return _binOp<[](auto lhs, auto rhs) { return lhs != rhs; }>(set, boolSet);
+    }
+
+    std::unique_ptr<ISet> contains(ISet const &set, ISet *boolSet) const override {
+        return equals(*set.superset(), boolSet);
+    }
+
+    std::unique_ptr<ISet> clone() const override { return std::make_unique<Base<T>>(*this); }
+
+    std::string show() const override {
+        if constexpr (isBool) {
+            return _val ? "true" : "false";
+        } else {
+            return std::to_string(_val);
+        }
+    }
+
+    T const &value() const { return _val; }
+
+private:
+    template <auto BinOp> std::unique_ptr<ISet> _binOp(ISet const &set, ISet *newSuperset = nullptr) const {
+        if (superset() != set.superset()) return nullptr;
+        auto res = BinOp(_val, set.cast<Base<T>>()._val);
+        return std::make_unique<Base<decltype(res)>>(res, newSuperset ? newSuperset : _superset);
+    }
+
+private:
+    T _val;
+    ISet *_superset{};
 };
 
 using Bool = Base<bool>;
 using Int = Base<int>;
 
-struct Identity : public ISet {
-    Identity() : ISet(nullptr) {}
-    [[nodiscard]] std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const override {
-        return std::make_unique<Bool>(this == &set, super);
+struct Identity : ISet {
+    Identity() = default;
+
+    ISet const *thisset() const override { return this; }
+    ISet const *superset() const override { return nullptr; }
+
+    std::unique_ptr<ISet> operator+(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator-(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator!() const override { return nullptr; }
+
+    std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+
+    std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const override {
+        return std::make_unique<Bool>(this == &set, boolSet);
     }
+
+    std::unique_ptr<ISet> noteq(ISet const &set, ISet *boolSet) const override {
+        return std::make_unique<Bool>(this != &set, boolSet);
+    }
+
+    std::unique_ptr<ISet> contains(ISet const &set, ISet *boolSet) const override {
+        return equals(*set.superset(), boolSet);
+    }
+
+    std::unique_ptr<ISet> clone() const override;
+
+    std::string show() const override { return "identity"; }
 };
 
-struct Sets : ISet, std::map<std::string, std::unique_ptr<ISet>> {
-    Sets(node::Module const *module = nullptr, ISet *superset = nullptr) : ISet(superset), module(module) {}
-    node::Module const *module;
-};
+class Ref : public ISet {
+public:
+    Ref(ISet const *set) : _set(*set) {}
+    ISet const *thisset() const override { return &_set; }
+    ISet const *superset() const override { return _set.superset(); }
 
-struct Ref : ISet {
-    Ref(ISet *set) : ISet(set) {}
-    [[nodiscard]] std::unique_ptr<ISet> operator+(ISet const &set) const override { return *pointer + set; }
-    [[nodiscard]] std::unique_ptr<ISet> operator-(ISet const &set) const override { return *pointer - set; }
-    [[nodiscard]] std::unique_ptr<ISet> operator*(ISet const &set) const override { return *pointer * set; }
-    [[nodiscard]] std::unique_ptr<ISet> operator/(ISet const &set) const override { return *pointer / set; }
-    [[nodiscard]] std::unique_ptr<ISet> operator|(ISet const &set) const override { return *pointer | set; }
-    [[nodiscard]] std::unique_ptr<ISet> equal(ISet const &set, ISet *super) const override {
-        return pointer->equal(set, super);
+    std::unique_ptr<ISet> operator+(ISet const &set) const override { return _set + set; }
+    std::unique_ptr<ISet> operator-(ISet const &set) const override { return _set - set; }
+    std::unique_ptr<ISet> operator*(ISet const &set) const override { return _set * set; }
+    std::unique_ptr<ISet> operator/(ISet const &set) const override { return _set / set; }
+    std::unique_ptr<ISet> operator!() const override { return !_set; }
+
+    std::unique_ptr<ISet> lt(ISet const &set, ISet *boolSet) const override { return _set.lt(set, boolSet); }
+    std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const override { return _set.gt(set, boolSet); }
+    std::unique_ptr<ISet> lteq(ISet const &set, ISet *boolSet) const override { return _set.lteq(set, boolSet); }
+    std::unique_ptr<ISet> gteq(ISet const &set, ISet *boolSet) const override { return _set.gteq(set, boolSet); }
+
+    std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const override { return _set.equals(set, boolSet); }
+    std::unique_ptr<ISet> noteq(ISet const &set, ISet *boolSet) const override { return _set.noteq(set, boolSet); }
+    std::unique_ptr<ISet> contains(ISet const &set, ISet *boolSet) const override {
+        return _set.contains(set, boolSet);
     }
-    [[nodiscard]] ISet *thisset() const override { return pointer; }
-    [[nodiscard]] ISet *superset() const override { return pointer->superset(); }
-    [[nodiscard]] std::string show() const override { return pointer->show(); }
+
+    std::unique_ptr<ISet> clone() const override { return std::make_unique<Ref>(&_set); }
+    std::string show() const override { return _set.show(); }
+
+private:
+    ISet const &_set;
 };
 
 struct Universe : ISet {
-    Universe() : ISet(nullptr) {}
-    std::unique_ptr<ISet> contains(const ISet &set, ISet *super) const override {
-        return (void)set, std::make_unique<Bool>(true, super);
+    ISet const *thisset() const override { return this; }
+    ISet const *superset() const override { return nullptr; }
+
+    std::unique_ptr<ISet> operator+(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator-(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator!() const override;
+
+    std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+
+    std::unique_ptr<ISet> equals(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> noteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> contains(const ISet & /*set*/, ISet *boolSet) const override {
+        return std::make_unique<Bool>(true, boolSet);
     }
+
+    std::unique_ptr<ISet> clone() const override { return std::make_unique<Ref>(this); }
+    std::string show() const override { return "universe"; }
 };
 
-struct Module : public ISet {
-    Module(std::string name) : ISet(nullptr), name(std::move(name)) {}
+struct Void : ISet {
+    ISet const *thisset() const override { return this; }
+    ISet const *superset() const override { return nullptr; }
+
+    std::unique_ptr<ISet> operator+(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator-(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator!() const override { return std::make_unique<Universe>(); }
+
+    std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+
+    std::unique_ptr<ISet> equals(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> noteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> contains(const ISet & /*set*/, ISet *boolSet) const override {
+        return std::make_unique<Bool>(false, boolSet);
+    }
+
+    std::unique_ptr<ISet> clone() const override { return std::make_unique<Ref>(this); }
+    std::string show() const override { return "void set"; }
+};
+
+class Sets : public ISet, public std::map<std::string, std::unique_ptr<ISet>> {
+public:
+    Sets(node::Module const *module = nullptr, ISet *superset = nullptr) : _superset(superset), module(module) {}
+
+    ISet const *thisset() const override { return this; }
+    ISet const *superset() const override { return _superset; }
+
+    std::unique_ptr<ISet> operator+(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator-(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator*(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator/(ISet const & /*set*/) const override { return nullptr; }
+    std::unique_ptr<ISet> operator!() const override { return nullptr; }
+
+    std::unique_ptr<ISet> lt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+
+    std::unique_ptr<ISet> equals(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> noteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> contains(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+
+    std::unique_ptr<ISet> clone() const override { return std::make_unique<Ref>(this); }
+    std::string show() const override { return "sets"; }
+
+public:
+    node::Module const *module;
+
+private:
+    ISet *_superset{};
+};
+
+struct Module {
+    Module(std::string name) : name(std::move(name)) {}
     std::string name;
     std::multimap<std::string, node::Fact *> facts;
     set::Module operator+(set::Module const &rhs) const {
@@ -133,5 +316,13 @@ struct Module : public ISet {
         return facts.empty();
     }
 };
+
+inline std::unique_ptr<ISet> Identity::clone() const {
+    return std::make_unique<Ref>(this);
+}
+
+inline std::unique_ptr<ISet> Universe::operator!() const {
+    return std::make_unique<Void>();
+}
 
 } // namespace set

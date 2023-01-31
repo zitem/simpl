@@ -188,8 +188,7 @@ private:
 
 class Module : public Token {
 public:
-    Module();
-    Module(std::unique_ptr<Token> &&statements, Node const &node = {{}}, std::string name = {});
+    Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name);
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setName(std::string const &name);

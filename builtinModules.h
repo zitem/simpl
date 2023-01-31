@@ -14,77 +14,77 @@ struct BuiltinFact : node::Fact {
 
 struct Contains : BuiltinFact {
     Contains();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct If : BuiltinFact {
     If();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Else : BuiltinFact {
     Else();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Not : BuiltinFact {
     Not();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Neg : BuiltinFact {
     Neg();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
-struct Eq: BuiltinFact {
+struct Eq : BuiltinFact {
     Eq();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
-struct Noteq: BuiltinFact {
+struct Noteq : BuiltinFact {
     Noteq();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Add : BuiltinFact {
     Add();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Sub : BuiltinFact {
     Sub();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Mul : BuiltinFact {
     Mul();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Div : BuiltinFact {
     Div();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Lt : BuiltinFact {
     Lt();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Gt : BuiltinFact {
     Gt();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Lteq : BuiltinFact {
     Lteq();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 struct Gteq : BuiltinFact {
     Gteq();
-     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
 } // namespace builtinModules

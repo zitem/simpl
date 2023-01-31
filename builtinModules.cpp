@@ -3,13 +3,13 @@
 namespace builtinModules {
 
 std::vector<std::unique_ptr<node::Module>> all() {
+    static std::string_view const VIEW{"built-in module"};
     std::vector<std::unique_ptr<node::Module>> res;
     auto push = [&res](auto ptr) {
         auto stmt = std::make_unique<node::Statements>();
         auto const &name = ptr->name;
         stmt->pushBack(std::move(ptr));
-        auto module = std::make_unique<node::Module>(std::move(stmt));
-        module->setName(name);
+        auto module = std::make_unique<node::Module>(std::move(stmt), VIEW, name);
         res.push_back(std::move(module));
     };
     push(std::make_unique<Contains>());

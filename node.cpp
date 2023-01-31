@@ -165,23 +165,17 @@ std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     if (std::any_of(params.begin(), params.end(), [](auto const &pair) { return !pair.second; })) {
         return nullptr;
     }
-    {
-        auto setsfind = params.find(str());
-        if (setsfind != params.end()) {
-            if (!setsfind->second) {
-                return nullptr;
-            }
-            return setsfind->second->clone();
+    if (auto setsfind = params.find(str()); setsfind != params.end()) {
+        if (!setsfind->second) {
+            return nullptr;
         }
+        return setsfind->second->clone();
     }
-    {
-        auto setsfind = ctx.sets.find(str());
-        if (setsfind != ctx.sets.end()) {
-            if (!setsfind->second) {
-                return nullptr;
-            }
-            return setsfind->second->clone();
+    if (auto setsfind = ctx.sets.find(str()); setsfind != ctx.sets.end()) {
+        if (!setsfind->second) {
+            return nullptr;
         }
+        return setsfind->second->clone();
     }
     auto facts = params.module->getFacts();
     auto factFind = facts.facts.equal_range(str());
@@ -287,15 +281,8 @@ std::unique_ptr<set::ISet> Statements::solve(Context &ctx) const {
     return sets;
 }
 
-std::unique_ptr<set::ISet> Module::solve(Context &ctx) const {
-    auto sets = std::make_unique<set::Sets>();
-    for (auto const &s : stmts->get()) {
-        if (s->kind != Kind::Fact) continue;
-        auto &fact = s->cast<Fact>();
-        auto name = std::string(fact.lvalue().view);
-        sets->emplace(name, s->solve(ctx));
-    }
-    return sets;
+std::unique_ptr<set::ISet> Module::solve(Context & /*ctx*/) const {
+    return nullptr;
 }
 
 Token::Token(Kind kind, std::string_view view) : Node(view), kind(kind) {}
@@ -362,9 +349,7 @@ void Binary::setRhs(std::unique_ptr<Token> &&param) {
 Fact::Fact(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue)
     : Token(Kind::Fact, rvalue ? lvalue->combine(*rvalue) : lvalue->view),
       _lvalue(&lvalue.release()->cast<Set>()),
-      _rvalue(std::move(rvalue)) {
-    Quiet();
-}
+      _rvalue(std::move(rvalue)) {}
 
 void Statements::pushFront(std::unique_ptr<Token> &&stmt) {
     if (!stmt) return;
@@ -377,8 +362,6 @@ void Statements::pushBack(std::unique_ptr<Token> &&stmt) {
     _statements.push_back(std::move(stmt));
     view = _statements.front()->combine(*_statements.back()).view;
 }
-
-Module::Module() : Module(std::make_unique<Statements>()) {}
 
 Module::Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name)
     : Token(Kind::Module, node), stmts(std::make_unique<Statements>()), _name(std::move(name)) {

@@ -174,17 +174,7 @@ struct Int : BaseSet<Int> {
     int value() const { return std::stoi(std::string(view)); }
 };
 
-class Statements : public Token {
-public:
-    template <typename... T> Statements(T &&...init) : Token(Kind::Stmt, {}) { (..., pushBack(std::move(init))); }
-    void pushFront(std::unique_ptr<Token> &&stmt);
-    void pushBack(std::unique_ptr<Token> &&stmt);
-    void dump(size_t indent = 0) const override;
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
-    std::deque<std::unique_ptr<Token>> const &get() const { return _statements; }
-private:
-    std::deque<std::unique_ptr<Token>> _statements;
-};
+class Statements;
 
 class Module : public Token {
 public:
@@ -195,10 +185,24 @@ public:
     void setName(std::string_view const &name);
     std::string const &getName() const;
     set::Module getFacts() const;
-public:
-    std::unique_ptr<Statements> stmts;
+    Module const *find(std::string const &name) const;
 private:
+    std::unique_ptr<Statements> _stmts;
     std::string _name;
+    std::map<std::string_view, std::unique_ptr<Module>> _modules;
+};
+
+class Statements : public Token {
+public:
+    template <typename... T> Statements(T &&...init) : Token(Kind::Stmt, {}) { (..., pushBack(std::move(init))); }
+    void pushFront(std::unique_ptr<Token> &&stmt);
+    void pushBack(std::unique_ptr<Token> &&stmt);
+    void dump(size_t indent = 0) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    std::deque<std::unique_ptr<Token>> const &get() const { return _statements; }
+private:
+    std::deque<std::unique_ptr<Token>> _statements;
+    friend Module::Module(std::unique_ptr<Token> &&, Node const &, std::string);
 };
 
 class Expression : public Token {

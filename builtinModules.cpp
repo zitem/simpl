@@ -33,7 +33,7 @@ std::vector<std::unique_ptr<node::Module>> all() {
 std::map<std::string, node::Module *> genMap(std::vector<std::unique_ptr<node::Module>> const &all) {
     std::map<std::string, node::Module *> res;
     for (auto const &m : all) {
-        res[m->stmts->get().front()->cast<BuiltinFact>().name] = &*m;
+        res[m->getFacts().facts.begin()->second->cast<BuiltinFact>().name] = &*m;
     }
     return res;
 }

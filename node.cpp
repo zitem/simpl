@@ -202,7 +202,7 @@ std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     return nullptr;
 }
 
-std::unique_ptr<set::ISet> solveExpr(Module *module, Set const &extract, Statements const &params, Context &ctx) {
+std::unique_ptr<set::ISet> solveExpr(Module const *module, Set const &extract, Statements const &params, Context &ctx) {
     auto p = params.solve(ctx);
     auto *sets = &p.release()->cast<set::Sets>();
     sets->module = module;
@@ -214,10 +214,19 @@ std::unique_ptr<set::ISet> solveExpr(Module *module, Set const &extract, Stateme
 
 std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
     auto name = std::string(_module);
-    auto moduleFind = ctx.modules.find(name);
-    auto *module = moduleFind->second;
-    if (moduleFind == ctx.modules.end()) {
-        Quiet<style::red>(), "undeclared params '", name, "'\n";
+    auto findBuiltin = ctx.modules.find(name);
+    Module const *module{};
+    if (findBuiltin != ctx.modules.end()) {
+        module = findBuiltin->second;
+    }
+    if (const auto *find = ctx.params.top()->module->find(name)) {
+        if (module) {
+            Quiet<style::yellow>(), "overwrite built-in module '", name, "'\n";
+        }
+        module = find;
+    }
+    if (!module) {
+        Quiet<style::red>(), "undeclared module '", name, "'\n";
         _stmts->printCode(ctx.file);
         return nullptr;
     }
@@ -364,9 +373,27 @@ void Statements::pushBack(std::unique_ptr<Token> &&stmt) {
 }
 
 Module::Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name)
-    : Token(Kind::Module, node), stmts(std::make_unique<Statements>()), _name(std::move(name)) {
-    stmts.reset(&statements.release()->cast<Statements>());
-    view = stmts->view;
+    : Token(Kind::Module, node),
+      _stmts(std::make_unique<Statements>()),
+      _name(std::move(name)) // \n
+{
+    _stmts.reset(&statements.release()->cast<Statements>());
+    view = _stmts->view;
+    auto &stmts = _stmts->_statements;
+    for (auto it = stmts.begin(); it != stmts.end();) {
+        auto &stmt = *it;
+        if (stmt->kind == Kind::Module) {
+            auto module = std::unique_ptr<Module>(&stmt.release()->cast<Module>());
+            auto const &name = module->getName();
+            if (name == _name) {
+                Quiet<style::red>(), "module '", name, "' has the same name as parent\n";
+            }
+            _modules.insert({name, std::move(module)});
+            it = stmts.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void Module::setName(std::string const &name) {
@@ -384,13 +411,23 @@ std::string const &Module::getName() const {
 
 set::Module Module::getFacts() const {
     auto m = set::Module(getName());
-    for (auto const &s : stmts->cast<Statements>().get()) {
-        if (s->kind != Kind::Fact) continue;
+    for (auto const &s : _stmts->cast<Statements>().get()) {
         auto &fact = s->cast<Fact>();
         auto name = std::string(fact.lvalue().view);
         m.facts.emplace(name, &fact);
     }
     return m;
+}
+
+Module const *Module::find(std::string const &name) const {
+    if (name == _name) {
+        return this;
+    }
+    auto f = _modules.find(name);
+    if (f != _modules.end()) {
+        return f->second.get();
+    }
+    return nullptr;
 }
 
 void Token::dump(size_t indent) const {
@@ -435,5 +472,5 @@ void Statements::dump(size_t indent) const {
 
 void Module::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "module " << getName() << "\n";
-    stmts->dump(indent + 1);
+    _stmts->dump(indent + 1);
 }

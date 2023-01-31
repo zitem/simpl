@@ -42,7 +42,6 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
             auto module = std::make_unique<node::Module>(
                 genAst(nonterm(3), ctx), get(0)->combine(*get(4)), std::string(nonterm(1).view)
             );
-            ctx.modules[module->getName()] = module.get();
             return module;
         }
         default: return nullptr;
@@ -197,7 +196,6 @@ void run(char const *filename) {
 
     auto modulename = filename2module(filename);
     auto root = node::Module(std::move(ast), {str}, modulename);
-    ctx.modules[root.getName()] = &root;
     ctx.params.push(std::make_unique<set::Sets>(&root));
     auto expr = node::Expression(std::make_unique<node::Set>("main"), modulename);
     auto solved = expr.solve(ctx);

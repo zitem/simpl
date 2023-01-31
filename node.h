@@ -123,9 +123,9 @@ class Context;
 namespace node {
 
 struct Token : Node {
-    virtual ~Token() = default;
     Token(Kind kind, Node const &node);
     Token(Kind kind, std::string_view view);
+    virtual ~Token() = default;
 
     virtual std::unique_ptr<set::ISet> solve(Context &ctx) const { return (void)ctx, nullptr; }
     virtual void dump(size_t indent = 0) const;
@@ -180,6 +180,7 @@ public:
     void pushFront(std::unique_ptr<Token> &&stmt);
     void pushBack(std::unique_ptr<Token> &&stmt);
     void dump(size_t indent = 0) const override;
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     std::deque<std::unique_ptr<Token>> const &get() const { return _statements; }
 private:
     std::deque<std::unique_ptr<Token>> _statements;
@@ -201,13 +202,44 @@ private:
     std::string _name;
 };
 
-struct Expression : Token {
-    Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&module = {});
-    void dump(size_t indent = 0) const override;
+class Expression : public Token {
+public:
+    Expression(
+        std::unique_ptr<Token> &&extract,
+        std::string_view module = "",
+        std::unique_ptr<Token> &&stmts = std::make_unique<Statements>()
+    );
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
-    void pushParam(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue) const;
-    std::unique_ptr<Set> extract;
-    std::unique_ptr<Module> module;
+    void dump(size_t indent = 0) const override;
+    void setModuleName(std::string_view name);
+    std::string_view getModuleName() const;
+private:
+    std::unique_ptr<Set> _extract;
+    std::unique_ptr<Statements> _stmts;
+    std::string_view _module;
+};
+
+class Unary : public Token {
+public:
+    Unary(Token const &op) : Token(Kind::Expr, op), _op(op.kind) {}
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    void dump(size_t indent = 0) const override;
+    void setParam(std::unique_ptr<Token> &&param);
+private:
+    std::unique_ptr<Statements> _params;
+    Kind _op;
+};
+
+class Binary : public Token {
+public:
+    Binary(Token const &op) : Token(Kind::Expr, op), _op(op.kind) {}
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    void dump(size_t indent = 0) const override;
+    void setLhs(std::unique_ptr<Token> &&param);
+    void setRhs(std::unique_ptr<Token> &&param);
+private:
+    std::unique_ptr<Statements> _params = std::make_unique<Statements>();
+    Kind _op;
 };
 
 class Fact : public Token {

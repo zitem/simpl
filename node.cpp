@@ -208,29 +208,56 @@ std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
     return nullptr;
 }
 
-std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
-    auto moduleName = module->cast<Module>().getName();
-    auto moduleFind = ctx.modules.find(moduleName);
-    if (moduleFind == ctx.modules.end()) {
-        Quiet<style::red>(), "undeclared module '", moduleName, "'\n";
-        module->printCode(ctx.file);
-        return nullptr;
-    }
-    auto facts = moduleFind->second->getFacts().facts;
-    auto factsFind = facts.find(extract->str());
-    if (factsFind == facts.end()) {
-        Quiet<style::red>(), "undeclared extract '", extract->view, "'\n";
-        extract->printCode(ctx.file);
-        return nullptr;
-    }
-    auto params = module->solve(ctx);
-    params->cast<set::Sets>().module = moduleFind->second;
-    auto ptr = std::make_unique<set::Sets>();
-    ptr.reset(&params.release()->cast<set::Sets>());
-    ctx.params.push(std::move(ptr));
-    auto solve = extract->solve(ctx);
+std::unique_ptr<set::ISet> solveExpr(Module *module, Set const &extract, Statements const &params, Context &ctx) {
+    auto p = params.solve(ctx);
+    auto *sets = &p.release()->cast<set::Sets>();
+    sets->module = module;
+    ctx.params.push(std::unique_ptr<set::Sets>(sets));
+    auto solve = extract.solve(ctx);
     ctx.params.pop();
     return solve;
+}
+
+std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
+    auto name = std::string(_module);
+    auto moduleFind = ctx.modules.find(name);
+    auto *module = moduleFind->second;
+    if (moduleFind == ctx.modules.end()) {
+        Quiet<style::red>(), "undeclared params '", name, "'\n";
+        _stmts->printCode(ctx.file);
+        return nullptr;
+    }
+    auto facts = module->getFacts().facts;
+    auto factsFind = facts.find(_extract->str());
+    if (factsFind == facts.end()) {
+        Quiet<style::red>(), "undeclared extract '", _extract->view, "'\n";
+        _extract->printCode(ctx.file);
+        return nullptr;
+    }
+    return ::solveExpr(module, *_extract, *_stmts, ctx);
+}
+
+std::unique_ptr<set::ISet> Unary::solve(Context &ctx) const {
+    auto module = ctx.modules.find(_op == Kind::Exclamation ? "Not" : "Neg");
+    return ::solveExpr(module->second, Set("extract"), *_params, ctx);
+}
+
+std::unique_ptr<set::ISet> Binary::solve(Context &ctx) const {
+    static std::map<Kind, std::string> const TABLE{
+        {      Kind::SinglePlus,   "Add"},
+        {     Kind::SingleMinus,   "Sub"},
+        {  Kind::SingleAsterisk,   "Mul"},
+        {     Kind::SingleSlash,   "Div"},
+        {        Kind::LessThan,    "Lt"},
+        {       Kind::GreatThan,    "Gt"},
+        { Kind::LessThanOrEqual,  "Lteq"},
+        {Kind::GreatThanOrEqual,  "Gteq"},
+        {     Kind::DoubleEqual,    "Eq"},
+        {Kind::ExclamationEqual, "Noteq"},
+        {     Kind::Exclamation,   "Not"},
+    };
+    auto module = ctx.modules.find(TABLE.at(_op));
+    return ::solveExpr(module->second, Set("extract"), *_params, ctx);
 }
 
 std::unique_ptr<set::ISet> Fact::solve(Context &ctx) const {
@@ -249,15 +276,15 @@ std::unique_ptr<set::ISet> Fact::solve(Context &ctx) const {
     return rsolve;
 }
 
-set::Module Module::getFacts() const {
-    auto m = set::Module(getName());
-    for (auto const &s : stmts->cast<Statements>().get()) {
+std::unique_ptr<set::ISet> Statements::solve(Context &ctx) const {
+    auto sets = std::make_unique<set::Sets>();
+    for (auto const &s : get()) {
         if (s->kind != Kind::Fact) continue;
         auto &fact = s->cast<Fact>();
         auto name = std::string(fact.lvalue().view);
-        m.facts.emplace(name, &fact);
+        sets->emplace(name, s->solve(ctx));
     }
-    return m;
+    return sets;
 }
 
 std::unique_ptr<set::ISet> Module::solve(Context &ctx) const {
@@ -293,19 +320,51 @@ Token *Set::getSuperset() {
     return _annotation.get();
 }
 
-Expression::Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&module)
-    : Token(Kind::Expr, module->combine(*extract)),
-      extract(&extract.release()->cast<Set>()),
-      module(&module.release()->cast<Module>()) {}
+Expression::Expression(std::unique_ptr<Token> &&extract, std::string_view module, std::unique_ptr<Token> &&stmts)
+    : Token(Kind::Expr, stmts->combine(*extract)),
+      _extract(&extract.release()->cast<Set>()),
+      _stmts(&stmts.release()->cast<Statements>()),
+      _module(module) {}
 
-void Expression::pushParam(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue) const {
-    module->stmts->pushBack(std::make_unique<Fact>(std::move(lvalue), std::move(rvalue)));
+void Expression::setModuleName(std::string_view name) {
+    _module = name;
+    view = Node(name).combine(view).view;
+}
+
+std::string_view Expression::getModuleName() const {
+    return _module;
+}
+
+void Unary::setParam(std::unique_ptr<Token> &&param) {
+    view = combine(*param).view;
+    auto factView = param->view;
+    auto fact = std::make_unique<Fact>(std::make_unique<Set>("v"), std::move(param));
+    fact->view = factView;
+    _params = std::make_unique<Statements>(std::move(fact));
+}
+
+void Binary::setLhs(std::unique_ptr<Token> &&param) {
+    view = param->combine(*this).view;
+    auto factView = param->view;
+    auto fact = std::make_unique<Fact>(std::make_unique<Set>("x"), std::move(param));
+    fact->view = factView;
+    _params->pushFront(std::move(fact));
+}
+
+void Binary::setRhs(std::unique_ptr<Token> &&param) {
+    view = combine(*param).view;
+    auto factView = param->view;
+    auto fact = std::make_unique<Fact>(std::make_unique<Set>("y"), std::move(param));
+    fact->view = factView;
+    _params->pushBack(std::move(fact));
 }
 
 Fact::Fact(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue)
     : Token(Kind::Fact, rvalue ? lvalue->combine(*rvalue) : lvalue->view),
       _lvalue(&lvalue.release()->cast<Set>()),
-      _rvalue(std::move(rvalue)) {}
+      _rvalue(std::move(rvalue)) {
+    Quiet();
+}
 
 void Statements::pushFront(std::unique_ptr<Token> &&stmt) {
     if (!stmt) return;
@@ -340,6 +399,17 @@ std::string const &Module::getName() const {
     return _name;
 }
 
+set::Module Module::getFacts() const {
+    auto m = set::Module(getName());
+    for (auto const &s : stmts->cast<Statements>().get()) {
+        if (s->kind != Kind::Fact) continue;
+        auto &fact = s->cast<Fact>();
+        auto name = std::string(fact.lvalue().view);
+        m.facts.emplace(name, &fact);
+    }
+    return m;
+}
+
 void Token::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "token\n";
 }
@@ -354,8 +424,18 @@ void Set::dump(size_t indent) const {
 
 void Expression::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "expr\n";
-    if (extract) extract->dump(indent + 1);
-    if (module) module->dump(indent + 1);
+    if (_extract) _extract->dump(indent + 1);
+    if (_stmts) _stmts->dump(indent + 1);
+}
+
+void Unary::dump(size_t indent) const {
+    std::cout << std::string(indent * 2, ' ') << _op.show() << "\n";
+    _params->dump(indent + 1);
+}
+
+void Binary::dump(size_t indent) const {
+    std::cout << std::string(indent * 2, ' ') << _op.show() << "\n";
+    _params->dump(indent + 1);
 }
 
 void Fact::dump(size_t indent) const {

@@ -38,7 +38,7 @@ void Parser::setRawText(std::string const &str) {
     _text = &str;
 }
 
-std::stack<std::unique_ptr<Token>> const &Parser::getCST() const {
+std::stack<std::unique_ptr<Token>> const &Parser::getCst() const {
     return _cst;
 }
 

@@ -3,51 +3,30 @@
 #include "outs.h"
 #include "parser.h"
 
-using namespace node;
-
-template <bool Unary> auto makeExpr(Kind op) {
-    static std::map<Kind, std::string> const TABLE{
-        {      Kind::SinglePlus,                 "Add"},
-        {     Kind::SingleMinus, Unary ? "Neg" : "Sub"},
-        {  Kind::SingleAsterisk,                 "Mul"},
-        {     Kind::SingleSlash,                 "Div"},
-        {        Kind::LessThan,                  "Lt"},
-        {       Kind::GreatThan,                  "Gt"},
-        { Kind::LessThanOrEqual,                "Lteq"},
-        {Kind::GreatThanOrEqual,                "Gteq"},
-        {     Kind::DoubleEqual,                  "Eq"},
-        {Kind::ExclamationEqual,               "Noteq"},
-        {     Kind::Exclamation,                 "Not"},
-    };
-    auto modu = std::make_unique<Module>();
-    modu->setName(TABLE.at(op));
-    return std::make_unique<Expression>(std::make_unique<Set>("extract"), std::move(modu));
-}
-
-std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
+std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
     auto get = [&self](auto idx) { return self.args[self.size - 1 - idx].get(); };
-    auto nonterm = [&get](auto idx) -> Nonterm & { return get(idx)->template cast<Nonterm>(); };
+    auto nonterm = [&get](auto idx) -> node::Nonterm & { return get(idx)->template cast<node::Nonterm>(); };
 
     switch (self.kind.value()) {
 
-    case Kind::Root: return std::make_unique<Module>(genAst(nonterm(0), ctx), self.view);
+    case Kind::Root: return genAst(nonterm(0), ctx);
 
     case Kind::Stmt: {
         if (auto stmt = genAst(nonterm(1), ctx)) {
-            stmt->cast<Statements>().pushFront(genAst(nonterm(0), ctx));
+            stmt->cast<node::Statements>().pushFront(genAst(nonterm(0), ctx));
             return stmt;
         }
-        auto stmt = std::make_unique<Statements>(genAst(nonterm(0), ctx));
+        auto stmt = std::make_unique<node::Statements>(genAst(nonterm(0), ctx));
         return stmt;
     }
 
     case Kind::Stm_: {
         if (get(0)->kind == Kind::Epsilon) return nullptr;
         if (auto stmt = genAst(nonterm(2), ctx)) {
-            stmt->cast<Statements>().pushFront(genAst(nonterm(1), ctx));
+            stmt->cast<node::Statements>().pushFront(genAst(nonterm(1), ctx));
             return stmt;
         }
-        return std::make_unique<Statements>(genAst(nonterm(1), ctx));
+        return std::make_unique<node::Statements>(genAst(nonterm(1), ctx));
     }
 
     case Kind::Fact:
@@ -55,12 +34,12 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         case Kind::Id: {
             auto lvalue = genAst(nonterm(0), ctx);
             if (auto annot = genAst(nonterm(1), ctx)) {
-                lvalue->cast<Set>().setSuperset(std::move(annot));
+                lvalue->cast<node::Set>().setSuperset(std::move(annot));
             }
-            return std::make_unique<Fact>(std::move(lvalue), genAst(nonterm(2), ctx));
+            return std::make_unique<node::Fact>(std::move(lvalue), genAst(nonterm(2), ctx));
         }
         case Kind::Module: {
-            auto module = std::make_unique<Module>(
+            auto module = std::make_unique<node::Module>(
                 genAst(nonterm(3), ctx), get(0)->combine(*get(4)), std::string(nonterm(1).view)
             );
             ctx.modules[module->getName()] = module.get();
@@ -78,11 +57,11 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         auto res = std::move(expr);
         if (hasR2L) {
             auto exp = genAst(nonterm(0), ctx);
-            exp->cast<Expression>().pushParam(std::make_unique<Set>("v"), std::move(res));
+            exp->cast<node::Unary>().setParam(std::move(res));
             res = std::move(exp);
         }
         if (ltor) {
-            ltor->cast<Expression>().pushParam(std::make_unique<Set>("x"), std::move(res));
+            ltor->cast<node::Binary>().setLhs(std::move(res));
             res = std::move(ltor);
         }
         return std::move(res);
@@ -92,7 +71,7 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         switch (get(0)->kind.value()) {
         case Kind::Id:
             if (auto expr = genAst(nonterm(1), ctx)) {
-                expr->cast<Expression>().module->cast<Module>().setName(nonterm(0).view);
+                expr->cast<node::Expression>().setModuleName(nonterm(0).view);
                 return expr;
             }
             return genAst(nonterm(0), ctx);
@@ -105,35 +84,35 @@ std::unique_ptr<Token> genAst(Nonterm &self, Context &ctx) {
         auto expr = genAst(nonterm(1), ctx);
         auto right = genAst(nonterm(2), ctx);
         if (!right) {
-            left->cast<Expression>().pushParam(std::make_unique<Set>("y"), std::move(expr));
+            left->cast<node::Binary>().setRhs(std::move(expr));
             return left;
         }
-        right->cast<Expression>().pushParam(std::make_unique<Set>("x"), std::move(expr));
-        left->cast<Expression>().pushParam(std::make_unique<Set>("y"), std::move(right));
+        right->cast<node::Binary>().setRhs(std::move(expr));
+        left->cast<node::Binary>().setRhs(std::move(right));
         return left;
     }
 
-    case Kind::RtoL: return makeExpr<true>(get(0)->kind.value());
+    case Kind::RtoL: return std::make_unique<node::Unary>(*get(0));
 
-    case Kind::Binary: return makeExpr<false>(get(0)->kind.value());
+    case Kind::Binary: return std::make_unique<node::Binary>(*get(0));
 
     case Kind::Extract:
         switch (get(0)->kind.value()) {
         case Kind::Epsilon: return nullptr;
         case Kind::OpenParenthesis:
-            return std::make_unique<Expression>(
-                genAst(nonterm(4), ctx), std::make_unique<Module>(genAst(nonterm(1), ctx), get(0)->combine(*get(4)))
+            return std::make_unique<node::Expression>(
+                genAst(nonterm(4), ctx), get(0)->combine(*get(4)).view, genAst(nonterm(1), ctx)
             );
-        case Kind::Dot: return std::make_unique<Expression>(genAst(nonterm(1), ctx), std::make_unique<Module>());
+        case Kind::Dot: return std::make_unique<node::Expression>(genAst(nonterm(1), ctx));
         }
 
     case Kind::Annot: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
 
-    case Kind::Id: return std::make_unique<Set>(self.view);
+    case Kind::Id: return std::make_unique<node::Set>(self.view);
 
-    case Kind::Bool: return std::make_unique<Bool>(self.view);
+    case Kind::Bool: return std::make_unique<node::Bool>(self.view);
 
-    case Kind::Number: return std::make_unique<Int>(self.view);
+    case Kind::Number: return std::make_unique<node::Int>(self.view);
 
     default: return nullptr;
     }
@@ -212,15 +191,15 @@ void run(char const *filename) {
     }
 
     Context ctx(str);
-    auto ast = genAst(parser.getCST()._Get_container().front()->cast<Nonterm>(), ctx);
+    auto ast = genAst(parser.getCst()._Get_container().front()->cast<node::Nonterm>(), ctx);
     // ast->dump();
     // std::cout << std::flush;
 
-    auto &root = ast->cast<Module>();
-    root.setName(filename2module(filename));
+    auto modulename = filename2module(filename);
+    auto root = node::Module(std::move(ast), {str}, modulename);
     ctx.modules[root.getName()] = &root;
     ctx.params.push(std::make_unique<set::Sets>(&root));
-    auto expr = Expression(std::make_unique<Set>("main"), std::move(ast));
+    auto expr = node::Expression(std::make_unique<node::Set>("main"), modulename);
     auto solved = expr.solve(ctx);
 
     // compile to llvm ir here
@@ -247,23 +226,6 @@ void run(char const *filename) {
 int main(int argc, char *argv[]) {
     run(((void)argc, argv[1])); // NOLINT
     std::vector<std::string> emoji = {"🥳", "😘", "😗", "😙", "😚"};
-    auto idx = std::chrono::system_clock::now().time_since_epoch().count() % 5;
+    auto idx = std::chrono::system_clock::now().time_since_epoch().count() % emoji.size();
     std::cout << emoji[idx] << '\n';
-}
-
-void lex2() {
-    std::ifstream file("Test.sip");
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    auto str = buffer.str();
-
-    uint32_t cnt{};
-    enum { COUNT = 1 << 8 };
-    using namespace std::chrono;
-    auto start = system_clock::now();
-    for (int i{}; i < COUNT; ++i) {
-        Lexer lexer(str);
-    }
-    auto end = system_clock::now();
-    std::cout << cnt / COUNT << "[" << duration_cast<milliseconds>(end - start) << "]";
 }

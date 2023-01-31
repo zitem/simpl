@@ -191,10 +191,10 @@ void LangCFG::test() {
     }
 
     Parser::CFG answer;
-    if (parser.getCST().empty()) {
+    if (parser.getCst().empty()) {
         Quiet(), "cst empty\n", exit(1);
     }
-    genCFG(*static_cast<Nonterm *>(parser.getCST()._Get_container().front().get()), answer);
+    genCFG(*static_cast<Nonterm *>(parser.getCst()._Get_container().front().get()), answer);
 
     Quiet(), "test ", answer == sampleAnswer ? "ok" : "failed", '\n';
 }
@@ -218,12 +218,12 @@ Parser::CFG LangCFG::getCFG() {
 
     Parser::CFG langCFG;
 
-    if (parser.getCST().empty()) {
+    if (parser.getCst().empty()) {
         Quiet<style::red>(), "cst empty\n";
         exit(1);
     }
 
-    genCFG(*static_cast<Nonterm *>(parser.getCST()._Get_container().front().get()), langCFG);
+    genCFG(*static_cast<Nonterm *>(parser.getCst()._Get_container().front().get()), langCFG);
 
     Quiet(), style::red;
     if (next.view.length() > 1) {

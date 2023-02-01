@@ -49,35 +49,43 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
 
     case Kind::Fac_: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
 
-    case Kind::Expr: {
-        auto hasR2L = get(0)->kind == Kind::RtoL;
-        auto expr = genAst(nonterm(hasR2L ? 1 : 0), ctx);
-        auto ltor = genAst(nonterm(hasR2L ? 2 : 1), ctx);
-        auto res = std::move(expr);
-        if (hasR2L) {
-            auto exp = genAst(nonterm(0), ctx);
-            exp->cast<node::Unary>().setParam(std::move(res));
-            res = std::move(exp);
-        }
-        if (ltor) {
-            ltor->cast<node::Binary>().setLhs(std::move(res));
-            res = std::move(ltor);
-        }
-        return std::move(res);
-    }
-
-    case Kind::Exp_:
+    case Kind::Exp1:
         switch (get(0)->kind.value()) {
+        case Kind::RtoL: {
+            auto lexp = genAst(nonterm(0), ctx);
+            lexp->cast<node::Unary>().setParam(genAst(nonterm(1), ctx));
+            return lexp;
+        }
         case Kind::Id:
             if (auto expr = genAst(nonterm(1), ctx)) {
                 expr->cast<node::Expression>().setModuleName(nonterm(0).view);
                 return expr;
             }
             return genAst(nonterm(0), ctx);
+        case Kind::OpenParenthesis: return genAst(nonterm(1), ctx);
         default: return genAst(nonterm(0), ctx);
         }
 
-    case Kind::LtoR: {
+    case Kind::Exp2:
+    case Kind::Exp3:
+    case Kind::Exp4:
+    case Kind::Exp5:
+    case Kind::Exp6: {
+        auto l = genAst(nonterm(0), ctx);
+        auto r = genAst(nonterm(1), ctx);
+        if (r) {
+            auto &binary = r->cast<node::Binary>();
+            binary.setLhs(std::move(l));
+            return r;
+        }
+        return l;
+    }
+
+    case Kind::Exp2_:
+    case Kind::Exp3_:
+    case Kind::Exp4_:
+    case Kind::Exp5_:
+    case Kind::Exp6_: {
         if (get(0)->kind == Kind::Epsilon) return nullptr;
         auto left = genAst(nonterm(0), ctx);
         auto expr = genAst(nonterm(1), ctx);
@@ -86,14 +94,18 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
             left->cast<node::Binary>().setRhs(std::move(expr));
             return left;
         }
-        right->cast<node::Binary>().setRhs(std::move(expr));
-        left->cast<node::Binary>().setRhs(std::move(right));
-        return left;
+        left->cast<node::Binary>().setRhs(std::move(expr));
+        right->cast<node::Binary>().setLhs(std::move(left));
+        return right;
     }
 
     case Kind::RtoL: return std::make_unique<node::Unary>(*get(0));
 
-    case Kind::Binary: return std::make_unique<node::Binary>(*get(0));
+    case Kind::Op2:
+    case Kind::Op3:
+    case Kind::Op4:
+    case Kind::Op5:
+    case Kind::Op6: return std::make_unique<node::Binary>(*get(0));
 
     case Kind::Extract:
         switch (get(0)->kind.value()) {
@@ -146,9 +158,9 @@ void run(char const *filename) {
             std::make_shared<CharFixed>('|', Kind::SingleOr),
             std::make_shared<StrFixed>("||", Kind::DoubleOr),
             std::make_shared<CharFixed>('+', Kind::SinglePlus),
-            std::make_shared<StrFixed>("++", Kind::DoublePlus),
+            // std::make_shared<StrFixed>("++", Kind::DoublePlus),
             std::make_shared<CharFixed>('-', Kind::SingleMinus),
-            std::make_shared<StrFixed>("--", Kind::DoubleMinus),
+            // std::make_shared<StrFixed>("--", Kind::DoubleMinus),
             std::make_shared<CharFixed>('*', Kind::SingleAsterisk),
             std::make_shared<StrFixed>("**", Kind::DoubleAsterisk),
             std::make_shared<CharFixed>('/', Kind::SingleSlash),

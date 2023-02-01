@@ -23,7 +23,6 @@ public:
 
 private:
     void _pop();
-    void _popMarker();
     bool _isTerm(Kind k) const;
     bool _isReference(FoKind k) const;
     std::vector<Kind> _getTerm(Kind k) const;

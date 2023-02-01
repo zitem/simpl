@@ -82,6 +82,33 @@ struct Kind {
         IModule,
         Annot,
         Bool,
+        Op1,
+        Op2,
+        Op3,
+        Op4,
+        Op5,
+        Op6,
+        Op7,
+        Op8,
+        Op9,
+        Exp1,
+        Exp2,
+        Exp3,
+        Exp4,
+        Exp5,
+        Exp6,
+        Exp7,
+        Exp8,
+        Exp9,
+        Exp1_,
+        Exp2_,
+        Exp3_,
+        Exp4_,
+        Exp5_,
+        Exp6_,
+        Exp7_,
+        Exp8_,
+        Exp9_,
 
         GRoot,
         GFact,
@@ -224,7 +251,7 @@ private:
 
 class Unary : public Token {
 public:
-    Unary(Token const &op) : Token(Kind::Expr, op), _op(op.kind) {}
+    Unary(Token const &op) : Token(Kind::Unary, op), _op(op.kind) {}
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setParam(std::unique_ptr<Token> &&param);
@@ -235,13 +262,15 @@ private:
 
 class Binary : public Token {
 public:
-    Binary(Token const &op) : Token(Kind::Expr, op), _op(op.kind) {}
+    Binary(Token const &op) : Token(Kind::Binary, op), _op(op.kind) {}
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
+    void competedLhs(std::unique_ptr<Token> &&param);
     void setLhs(std::unique_ptr<Token> &&param);
     void setRhs(std::unique_ptr<Token> &&param);
 private:
     std::unique_ptr<Statements> _params = std::make_unique<Statements>();
+    Binary *_binaryLhs{};
     Kind _op;
 };
 

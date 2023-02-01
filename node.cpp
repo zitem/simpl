@@ -89,6 +89,33 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     { "IModule",            "IModule"},
     {   "Annot",              "Annot"},
     {    "Bool",               "Bool"},
+    {     "Op1",                "Op1"},
+    {     "Op2",                "Op2"},
+    {     "Op3",                "Op3"},
+    {     "Op4",                "Op4"},
+    {     "Op5",                "Op5"},
+    {     "Op6",                "Op6"},
+    {     "Op7",                "Op7"},
+    {     "Op8",                "Op8"},
+    {     "Op9",                "Op9"},
+    {    "Exp1",               "Exp1"},
+    {    "Exp2",               "Exp2"},
+    {    "Exp3",               "Exp3"},
+    {    "Exp4",               "Exp4"},
+    {    "Exp5",               "Exp5"},
+    {    "Exp6",               "Exp6"},
+    {    "Exp7",               "Exp7"},
+    {    "Exp8",               "Exp8"},
+    {    "Exp9",               "Exp9"},
+    {   "Exp1_",              "Exp1_"},
+    {   "Exp2_",              "Exp2_"},
+    {   "Exp3_",              "Exp3_"},
+    {   "Exp4_",              "Exp4_"},
+    {   "Exp5_",              "Exp5_"},
+    {   "Exp6_",              "Exp6_"},
+    {   "Exp7_",              "Exp7_"},
+    {   "Exp8_",              "Exp8_"},
+    {   "Exp9_",              "Exp9_"},
 
     {   "GRoot",              "GRoot"},
     {   "GFact",              "GFact"},
@@ -340,6 +367,13 @@ void Unary::setParam(std::unique_ptr<Token> &&param) {
 }
 
 void Binary::setLhs(std::unique_ptr<Token> &&param) {
+    if (_binaryLhs) {
+        _binaryLhs->setLhs(std::move(param));
+        return;
+    }
+    if (param->kind == Kind::Binary) {
+        _binaryLhs = &param->cast<Binary>();
+    }
     view = param->combine(*this).view;
     auto factView = param->view;
     auto fact = std::make_unique<Fact>(std::make_unique<Set>("x"), std::move(param));

@@ -14,17 +14,39 @@ Fact    ::= epsilon
         <$>
 
 Fact'   ::= epsilon
-        <+> = Expr
+        <+> = Exp6
         <$>
 
-Expr    ::= RtoL Expr' LtoR
-        <+> Expr' LtoR
-        <$>
-
-Expr'   ::= Id Extract
+Exp1    ::= Id Extract
+        <+> RtoL Exp1
         <+> Number
         <+> Bool
+        <+> ( Exp6 )
         <$>
+
+Exp2    ::= Exp1 Exp2' <$>
+Exp3    ::= Exp2 Exp3' <$>
+Exp4    ::= Exp3 Exp4' <$>
+Exp5    ::= Exp4 Exp5' <$>
+Exp6    ::= Exp5 Exp6' <$>
+
+Exp2'   ::= epsilon <+> Op2 Exp1 Exp2' <$>
+Exp3'   ::= epsilon <+> Op3 Exp2 Exp3' <$>
+Exp4'   ::= epsilon <+> Op4 Exp3 Exp4' <$>
+Exp5'   ::= epsilon <+> Op5 Exp4 Exp5' <$>
+Exp6'   ::= epsilon <+> Op6 Exp5 Exp6' <$>
+
+RtoL    ::= ! <+> - <$>
+
+Op2     ::= * <+> / <$>
+
+Op3     ::= + <+> - <$>
+
+Op4     ::= > <+> >= <+> < <+> <= <$>
+
+Op5     ::= == <+> != <$>
+
+Op6     ::= | <+> || <+> & <+> && <$>
 
 Extract ::= epsilon
         <+> ( Stmt ) . Id
@@ -32,16 +54,5 @@ Extract ::= epsilon
         <$>
 
 Annot   ::= epsilon
-        <+> : Expr
+        <+> : Exp6
         <$>
-
-LtoR    ::= epsilon
-        <+> Binary Expr' LtoR
-        <$>
-
-RtoL    ::= !
-        <+> -
-        <$>
-
-Binary  ::= + <+> - <+> * <+> / <+> > <+> >= <+> < <+> <=
-        <+> == <+> != <+> | <+> || <+> & <+> && <$>

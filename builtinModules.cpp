@@ -27,6 +27,8 @@ std::vector<std::unique_ptr<node::Module>> all() {
     push(std::make_unique<Gt>());
     push(std::make_unique<Lteq>());
     push(std::make_unique<Gteq>());
+    push(std::make_unique<And>());
+    push(std::make_unique<Or>());
     return res;
 };
 
@@ -176,6 +178,24 @@ std::unique_ptr<set::ISet> Gteq::solve(Context &ctx) const {
     auto const &y = facts.at("y");
     if (!x || !y) return nullptr;
     return x->gteq(*y, ctx.sets.at("bool").get());
+}
+
+And::And() : BuiltinFact("And") {}
+std::unique_ptr<set::ISet> And::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top()->cast<set::Sets>();
+    auto const &x = facts.at("x");
+    auto const &y = facts.at("y");
+    if (!x || !y) return nullptr;
+    return x->logicalAnd(*y, ctx.sets.at("bool").get());
+}
+
+Or::Or() : BuiltinFact("Or") {}
+std::unique_ptr<set::ISet> Or::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top()->cast<set::Sets>();
+    auto const &x = facts.at("x");
+    auto const &y = facts.at("y");
+    if (!x || !y) return nullptr;
+    return x->logicalOr(*y, ctx.sets.at("bool").get());
 }
 
 } // namespace builtinModules

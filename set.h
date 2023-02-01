@@ -24,6 +24,8 @@ struct ISet {
     virtual std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const = 0;
     virtual std::unique_ptr<ISet> lteq(ISet const &set, ISet *boolSet) const = 0;
     virtual std::unique_ptr<ISet> gteq(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> logicalAnd(ISet const &set, ISet *boolSet) const = 0;
+    virtual std::unique_ptr<ISet> logicalOr(ISet const &set, ISet *boolSet) const = 0;
 
     virtual std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const = 0;
     virtual std::unique_ptr<ISet> noteq(ISet const &set, ISet *boolSet) const = 0;
@@ -126,6 +128,22 @@ public:
         }
     }
 
+    std::unique_ptr<ISet> logicalAnd(ISet const &set, ISet *boolSet) const override {
+        if constexpr (isBool) {
+            return _binOp<[](auto lhs, auto rhs) { return lhs && rhs; }>(set, boolSet);
+        } else {
+            return nullptr;
+        }
+    }
+
+    std::unique_ptr<ISet> logicalOr(ISet const &set, ISet *boolSet) const override {
+        if constexpr (isBool) {
+            return _binOp<[](auto lhs, auto rhs) { return lhs || rhs; }>(set, boolSet);
+        } else {
+            return nullptr;
+        }
+    }
+
     std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const override {
         return _binOp<[](auto lhs, auto rhs) { return lhs == rhs; }>(set, boolSet);
     }
@@ -182,6 +200,8 @@ struct Identity : ISet {
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalAnd(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalOr(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
 
     std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const override {
         return std::make_unique<Bool>(this == &set, boolSet);
@@ -217,6 +237,12 @@ public:
     std::unique_ptr<ISet> gt(ISet const &set, ISet *boolSet) const override { return _set.gt(set, boolSet); }
     std::unique_ptr<ISet> lteq(ISet const &set, ISet *boolSet) const override { return _set.lteq(set, boolSet); }
     std::unique_ptr<ISet> gteq(ISet const &set, ISet *boolSet) const override { return _set.gteq(set, boolSet); }
+    std::unique_ptr<ISet> logicalAnd(ISet const &set, ISet *boolSet) const override {
+        return _set.logicalAnd(set, boolSet);
+    }
+    std::unique_ptr<ISet> logicalOr(ISet const &set, ISet *boolSet) const override {
+        return _set.logicalOr(set, boolSet);
+    }
 
     std::unique_ptr<ISet> equals(ISet const &set, ISet *boolSet) const override { return _set.equals(set, boolSet); }
     std::unique_ptr<ISet> noteq(ISet const &set, ISet *boolSet) const override { return _set.noteq(set, boolSet); }
@@ -246,6 +272,8 @@ struct Universe : ISet {
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalAnd(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalOr(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
 
     std::unique_ptr<ISet> equals(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> noteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
@@ -272,6 +300,8 @@ struct Void : ISet {
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalAnd(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalOr(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
 
     std::unique_ptr<ISet> equals(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> noteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
@@ -301,6 +331,8 @@ public:
     std::unique_ptr<ISet> gt(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> lteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> gteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalAnd(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
+    std::unique_ptr<ISet> logicalOr(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
 
     std::unique_ptr<ISet> equals(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }
     std::unique_ptr<ISet> noteq(ISet const & /*set*/, ISet * /*boolSet*/) const override { return nullptr; }

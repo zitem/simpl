@@ -285,6 +285,8 @@ std::unique_ptr<set::ISet> Binary::solve(Context &ctx) const {
         {     Kind::DoubleEqual,    "Eq"},
         {Kind::ExclamationEqual, "Noteq"},
         {     Kind::Exclamation,   "Not"},
+        {       Kind::DoubleAnd,   "And"},
+        {        Kind::DoubleOr,    "Or"},
     };
     auto module = ctx.modules.find(TABLE.at(_op));
     return ::solveExpr(module->second, Set("extract"), *_params, ctx);

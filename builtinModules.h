@@ -87,4 +87,14 @@ struct Gteq : BuiltinFact {
     std::unique_ptr<set::ISet> solve(Context &ctx) const override;
 };
 
+struct And : BuiltinFact {
+    And();
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
+struct Or : BuiltinFact {
+    Or();
+    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+};
+
 } // namespace builtinModules

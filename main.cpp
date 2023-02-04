@@ -190,7 +190,7 @@ void run(char const *filename) {
     std::ifstream file(filename);
     std::stringstream buffer;
     buffer << file.rdbuf();
-    auto str = buffer.str();
+    auto str = buffer.str() + ' ';
     parser.setRawText(str);
 
     Lexer lexer(str);
@@ -220,7 +220,7 @@ void run(char const *filename) {
         Quiet<style::blue>(), "> unsolved module '", root.getName(), "'\n";
     }
 
-    if (next.view.length() > 1) {
+    if (next.kind != Kind::Eof && next.view.length() > 1) {
         Quiet<style::red>(), "lex error: rest is '", next.view;
     }
 

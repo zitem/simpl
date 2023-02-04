@@ -5,10 +5,10 @@ node::Token Lexer::next(std::vector<std::shared_ptr<token::Base>> const &tokens)
     auto tmp = tokens;
 
     for (; _now < _string.length();) {
-        std::erase_if(tmp, [this](auto e) { return !e->match(_view()) && !e->over(_view()); });
+        auto const v = _view();
+        std::erase_if(tmp, [this, v](auto e) { return !e->match(v) && !e->over(v); });
         if (tmp.empty()) {
-            auto v = _view();
-            if (std::any_of(v.begin(), v.end(), [](char c) { return !token::isSpace(c); })) {
+            if (std::ranges::any_of(v, [](char c) { return !token::isSpace(c); })) {
                 Quiet<style::red>(), "undefined input '", v, "'\n";
             }
             _begin = ++_now;

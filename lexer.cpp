@@ -19,11 +19,11 @@ node::Token Lexer::next(std::vector<std::shared_ptr<token::Base>> const &tokens)
             ++_now;
         }
     }
+    auto v = _view(0);
     if (_now == _string.length()) {
         ++_returnedEof;
-        return {Kind::Eof, _view(0)};
+        return {Kind::Eof, v};
     }
-    auto v = _view(0);
     _begin = _now;
     return {tmp.front()->kind, v};
 }

@@ -127,8 +127,8 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
 
 Context::Context(std::string const &file) : _modules(builtinModules::all()), file(file) {
     modules = builtinModules::genMap(_modules);
-    sets["bool"] = std::make_unique<set::Identity>();
-    sets["int"] = std::make_unique<set::Identity>();
+    global.add("bool", set::create<set::Ref>(set::Bool::super).move());
+    global.add("int", set::create<set::Ref>(set::Int::super).move());
 }
 
 std::pair<Node::Pos, Node::Pos> Node::getRange(std::string const &str) const {
@@ -187,66 +187,56 @@ void Node::printCode(std::string const &file) const {
     std::cout << std::flush;
 }
 
-std::unique_ptr<set::ISet> Set::solve(Context &ctx) const {
-    auto &params = ctx.params.top()->cast<set::Sets>();
-    if (std::any_of(params.begin(), params.end(), [](auto const &pair) { return !pair.second; })) {
-        return nullptr;
+set::Set Set::solve(Context &ctx) const {
+    auto &params = ctx.params.top();
+    if (!params.set.ok()) {
+        return set::create();
     }
-    if (auto setsfind = params.find(str()); setsfind != params.end()) {
-        if (!setsfind->second) {
-            return nullptr;
+    if (auto local = params.set.extract(str()); local.ok()) {
+        if (!local.ok()) {
+            return set::create();
         }
-        return setsfind->second->clone();
+        return local;
     }
-    if (auto setsfind = ctx.sets.find(str()); setsfind != ctx.sets.end()) {
-        if (!setsfind->second) {
-            return nullptr;
+    if (auto global = ctx.global.extract(str()); global->ok()) {
+        if (!global->ok()) {
+            return set::create();
         }
-        return setsfind->second->clone();
+        return global;
     }
-    auto facts = params.module->getFacts();
-    auto factFind = facts.facts.equal_range(str());
-    std::unique_ptr<set::ISet> solved;
-    Fact *solvedFact;
-    for (auto it = factFind.first; it != factFind.second; ++it) {
-        if (auto solving = it->second->solve(ctx)) {
-            if (solved) {
-                Quiet<style::red>(), "'", view, "' ambiguous\n";
-                solvedFact->printCode(ctx.file);
-                it->second->printCode(ctx.file);
-                return nullptr;
-            }
-            solved = std::move(solving);
-            solvedFact = it->second;
-        }
-    }
-    if (solved) {
+    if (auto solved = params.module.extract(str(), ctx); solved.ok()) {
         return solved;
+    }
+    if (auto const *modFind = params.module.find(str())) {
+        return modFind->solve(ctx);
     }
     Quiet<style::yellow>(), "undefined extract '", view, "'\n";
     printCode(ctx.file);
     std::cout << std::flush;
-    return nullptr;
+    return set::create();
 }
 
-std::unique_ptr<set::ISet> solveExpr(Module const *module, Set const &extract, Statements const &params, Context &ctx) {
+set::Set solveExpr(Module const &module, Set const &extract, Statements const &params, Context &ctx) {
     auto p = params.solve(ctx);
-    auto *sets = &p.release()->cast<set::Sets>();
-    sets->module = module;
-    ctx.params.push(std::unique_ptr<set::Sets>(sets));
+    ctx.params.push({module, std::move(p)});
     auto solve = extract.solve(ctx);
     ctx.params.pop();
     return solve;
 }
 
-std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
+set::Set Expression::solve(Context &ctx) const {
     auto name = std::string(_module);
-    auto findBuiltin = ctx.modules.find(name);
+    auto const &params = ctx.params.top();
+    if (auto ex = params.set.extract(name); ex.ok()) {
+        if (auto e = ex.extract(_extract->value()); e.ok()) {
+            return e;
+        }
+    }
     Module const *module{};
-    if (findBuiltin != ctx.modules.end()) {
+    if (auto findBuiltin = ctx.modules.find(name); findBuiltin != ctx.modules.end()) {
         module = findBuiltin->second;
     }
-    if (const auto *find = ctx.params.top()->module->find(name)) {
+    if (auto const *find = params.module.find(name)) {
         if (module) {
             Quiet<style::yellow>(), "overwrite built-in module '", name, "'\n";
         }
@@ -255,24 +245,17 @@ std::unique_ptr<set::ISet> Expression::solve(Context &ctx) const {
     if (!module) {
         Quiet<style::red>(), "undeclared module '", name, "'\n";
         _stmts->printCode(ctx.file);
-        return nullptr;
+        return set::create();
     }
-    auto facts = module->getFacts().facts;
-    auto factsFind = facts.find(_extract->str());
-    if (factsFind == facts.end()) {
-        Quiet<style::red>(), "undeclared extract '", _extract->view, "'\n";
-        _extract->printCode(ctx.file);
-        return nullptr;
-    }
-    return ::solveExpr(module, *_extract, *_stmts, ctx);
+    return ::solveExpr(*module, *_extract, *_stmts, ctx);
 }
 
-std::unique_ptr<set::ISet> Unary::solve(Context &ctx) const {
-    auto module = ctx.modules.find(_op == Kind::Exclamation ? "Not" : "Neg");
-    return ::solveExpr(module->second, Set("extract"), *_params, ctx);
+set::Set Unary::solve(Context &ctx) const {
+    auto *module = ctx.modules.at(_op == Kind::Exclamation ? "Not" : "Neg");
+    return ::solveExpr(*module, Set("extract"), *_params, ctx);
 }
 
-std::unique_ptr<set::ISet> Binary::solve(Context &ctx) const {
+set::Set Binary::solve(Context &ctx) const {
     static std::map<Kind, std::string> const TABLE{
         {      Kind::SinglePlus,   "Add"},
         {     Kind::SingleMinus,   "Sub"},
@@ -288,39 +271,45 @@ std::unique_ptr<set::ISet> Binary::solve(Context &ctx) const {
         {       Kind::DoubleAnd,   "And"},
         {        Kind::DoubleOr,    "Or"},
     };
-    auto module = ctx.modules.find(TABLE.at(_op));
-    return ::solveExpr(module->second, Set("extract"), *_params, ctx);
+    auto *module = ctx.modules.at(TABLE.at(_op));
+    return ::solveExpr(*module, Set("extract"), *_params, ctx);
 }
 
-std::unique_ptr<set::ISet> Fact::solve(Context &ctx) const {
-    if (!_rvalue) return nullptr;
+set::Set Fact::solve(Context &ctx) const {
+    if (!_rvalue) return set::create();
     auto rsolve = _rvalue->solve(ctx);
-    if (!rsolve) {
-        return nullptr;
+    if (!rsolve.ok()) {
+        return set::create();
     }
     auto const &lannot = _lvalue->cast<Set>().getSuperset();
     // default lvalue superset is universe
-    auto lsuperset = lannot ? lannot->solve(ctx) : std::make_unique<set::Universe>();
-    auto sameSuper = lsuperset->contains(*rsolve, ctx.sets.at("bool").get());
-    if (!sameSuper->cast<set::Bool>().value()) {
-        return nullptr;
+    auto lsuperset = lannot ? lannot->solve(ctx) : set::create<set::Universe>();
+    auto sameSuper = lsuperset.contains(rsolve);
+    if (!sameSuper.ok()) {
+        return set::create();
+    }
+    if (!sameSuper.cast<set::Bool>().value()) {
+        return set::create();
     }
     return rsolve;
 }
 
-std::unique_ptr<set::ISet> Statements::solve(Context &ctx) const {
+set::Set Statements::solve(Context &ctx) const {
     auto sets = std::make_unique<set::Sets>();
     for (auto const &s : get()) {
-        if (s->kind != Kind::Fact) continue;
         auto &fact = s->cast<Fact>();
         auto name = std::string(fact.lvalue().view);
-        sets->emplace(name, s->solve(ctx));
+        auto solve = s->solve(ctx);
+        sets->add(name, solve.move());
     }
-    return sets;
+    return {std::move(sets)};
 }
 
-std::unique_ptr<set::ISet> Module::solve(Context & /*ctx*/) const {
-    return nullptr;
+set::Set Module::solve(Context &ctx) const {
+    ctx.params.push(*this);
+    auto solve = _stmts->solve(ctx);
+    ctx.params.pop();
+    return solve;
 }
 
 Token::Token(Kind kind, std::string_view view) : Node(view), kind(kind) {}
@@ -445,9 +434,9 @@ std::string const &Module::getName() const {
     return _name;
 }
 
-set::Module Module::getFacts() const {
-    auto m = set::Module(getName());
-    for (auto const &s : _stmts->cast<Statements>().get()) {
+Module::Facts Module::getFacts() const {
+    auto m = Module::Facts(getName());
+    for (auto const &s : _stmts->get()) {
         auto &fact = s->cast<Fact>();
         auto name = std::string(fact.lvalue().view);
         m.facts.emplace(name, &fact);
@@ -464,6 +453,27 @@ Module const *Module::find(std::string const &name) const {
         return f->second.get();
     }
     return nullptr;
+}
+
+set::Set Module::extract(std::string const &name, Context &ctx) const {
+    auto facts = getFacts();
+    auto factFind = facts.facts.equal_range(name);
+    auto solved = set::create();
+    Fact *solvedFact;
+    std::vector<set::Set> vec;
+    for (auto it = factFind.first; it != factFind.second; ++it) {
+        if (auto solving = it->second->solve(ctx); solving.ok()) {
+            if (solved.ok()) {
+                Quiet<style::red>(), "'", name, "' ambiguous\n";
+                solvedFact->printCode(ctx.file);
+                it->second->printCode(ctx.file);
+                return set::create();
+            }
+            solved = std::move(solving);
+            solvedFact = it->second;
+        }
+    }
+    return solved;
 }
 
 void Token::dump(size_t indent) const {

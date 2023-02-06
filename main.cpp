@@ -63,6 +63,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
             }
             return genAst(nonterm(0), ctx);
         case Kind::OpenParenthesis: return genAst(nonterm(1), ctx);
+        case Kind::OpenCurlyBracket: return std::make_unique<node::Void>(Node(get(0)->view).combine(*get(1)));
         default: return genAst(nonterm(0), ctx);
         }
 
@@ -121,9 +122,9 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
 
     case Kind::Id: return std::make_unique<node::Set>(self.view);
 
-    case Kind::Bool: return std::make_unique<node::Bool>(self.view);
+    case Kind::Bool: return std::make_unique<node::Bool>(self);
 
-    case Kind::Number: return std::make_unique<node::Int>(self.view);
+    case Kind::Number: return std::make_unique<node::Int>(self);
 
     default: return nullptr;
     }
@@ -201,6 +202,16 @@ void run(char const *filename) {
         syntaxErr += parser.parse(next);
     }
 
+    if (next.kind != Kind::Eof && next.view.length() > 1) {
+        Quiet<style::red>(), "lex error: rest is '", next.view;
+        return;
+    }
+
+    if (syntaxErr >= 1) {
+        Quiet<style::red>(), syntaxErr, " syntax error", syntaxErr == 1 ? "\n" : "s\n";
+        return;
+    }
+
     Context ctx(str);
     auto ast = genAst(parser.getCst()._Get_container().front()->cast<node::Nonterm>(), ctx);
     // ast->dump();
@@ -208,26 +219,16 @@ void run(char const *filename) {
 
     auto modulename = filename2module(filename);
     auto root = node::Module(std::move(ast), {str}, modulename);
-    ctx.params.push(std::make_unique<set::Sets>(&root));
+    ctx.params.push(root);
     auto expr = node::Expression(std::make_unique<node::Set>("main"), modulename);
     auto solved = expr.solve(ctx);
 
     // compile to llvm ir here
 
-    if (solved) {
-        Quiet<style::blue>(), "> ", solved->show(), "\n";
+    if (solved.ok()) {
+        Quiet<style::blue>(), "> ", solved.show(), "\n";
     } else {
         Quiet<style::blue>(), "> unsolved module '", root.getName(), "'\n";
-    }
-
-    if (next.kind != Kind::Eof && next.view.length() > 1) {
-        Quiet<style::red>(), "lex error: rest is '", next.view;
-    }
-
-    if (syntaxErr == 1) {
-        Quiet<style::red>(), "1 syntax error\n";
-    } else if (syntaxErr > 1) {
-        Quiet<style::red>(), syntaxErr, " syntax errors\n";
     }
 }
 

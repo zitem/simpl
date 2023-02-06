@@ -22,6 +22,7 @@ Exp1    ::= Id Extract
         <+> Number
         <+> Bool
         <+> ( Exp6 )
+        <+> { }
         <$>
 
 Exp2    ::= Exp1 Exp2' <$>
@@ -54,5 +55,5 @@ Extract ::= epsilon
         <$>
 
 Annot   ::= epsilon
-        <+> : Exp6
+        <+> : Exp1
         <$>

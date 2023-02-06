@@ -44,158 +44,158 @@ BuiltinFact::BuiltinFact(std::string name)
     : Fact(std::make_unique<node::Set>("extract"), nullptr), name(std::move(name)) {}
 
 Contains::Contains() : BuiltinFact("Contains") {}
-std::unique_ptr<set::ISet> Contains::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->contains(*y, ctx.sets.at("bool").get());
+set::Set Contains::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x.contains(y);
 }
 
 If::If() : BuiltinFact("If") {}
-std::unique_ptr<set::ISet> If::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &v = facts.at("v");
-    if (!v) return nullptr;
-    if (v->cast<set::Bool>().value()) {
-        return std::make_unique<set::Universe>();
+set::Set If::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &v = facts.set.extract("v");
+    if (!v.ok()) return set::create();
+    if (v.cast<set::Bool>().value()) {
+        return set::create<set::Universe>();
     }
-    return std::make_unique<set::Void>();
+    return set::create<set::Void>();
 }
 
 Else::Else() : BuiltinFact("Else") {}
-std::unique_ptr<set::ISet> Else::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &v = facts.at("v");
-    if (!v) return nullptr;
-    if (!v->cast<set::Bool>().value()) {
-        return std::make_unique<set::Universe>();
+set::Set Else::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &v = facts.set.extract("v");
+    if (!v.ok()) return set::create();
+    if (!v.cast<set::Bool>().value()) {
+        return set::create<set::Universe>();
     }
-    return std::make_unique<set::Void>();
+    return set::create<set::Void>();
 }
 
 Not::Not() : BuiltinFact("Not") {}
-std::unique_ptr<set::ISet> Not::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &v = facts.at("v");
-    if (!v) return nullptr;
-    return !*v;
+set::Set Not::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &v = facts.set.extract("v");
+    if (!v.ok()) return set::create();
+    return !v;
 }
 
 Neg::Neg() : BuiltinFact("Neg") {}
-std::unique_ptr<set::ISet> Neg::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &v = facts.at("v");
-    if (!v) return nullptr;
-    return -*v;
+set::Set Neg::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &v = facts.set.extract("v");
+    if (!v.ok()) return set::create();
+    return -v;
 }
 
 Eq::Eq() : BuiltinFact("Eq") {}
-std::unique_ptr<set::ISet> Eq::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->equals(*y, ctx.sets.at("bool").get());
+set::Set Eq::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x == y;
 }
 
 Noteq::Noteq() : BuiltinFact("Noteq") {}
-std::unique_ptr<set::ISet> Noteq::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->noteq(*y, ctx.sets.at("bool").get());
+set::Set Noteq::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x != y;
 }
 
 Add::Add() : BuiltinFact("Add") {}
-std::unique_ptr<set::ISet> Add::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return *x + *y;
+set::Set Add::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x + y;
 }
 
 Sub::Sub() : BuiltinFact("Sub") {}
-std::unique_ptr<set::ISet> Sub::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return *x - *y;
+set::Set Sub::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x - y;
 }
 
 Mul::Mul() : BuiltinFact("Mul") {}
-std::unique_ptr<set::ISet> Mul::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return *x * *y;
+set::Set Mul::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x * y;
 }
 
 Div::Div() : BuiltinFact("Div") {}
-std::unique_ptr<set::ISet> Div::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return *x / *y;
+set::Set Div::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x / y;
 }
 
 Lt::Lt() : BuiltinFact("Lt") {}
-std::unique_ptr<set::ISet> Lt::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->lt(*y, ctx.sets.at("bool").get());
+set::Set Lt::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x < y;
 }
 
 Gt::Gt() : BuiltinFact("Gt") {}
-std::unique_ptr<set::ISet> Gt::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->gt(*y, ctx.sets.at("bool").get());
+set::Set Gt::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x > y;
 }
 
 Lteq::Lteq() : BuiltinFact("Lteq") {}
-std::unique_ptr<set::ISet> Lteq::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->lteq(*y, ctx.sets.at("bool").get());
+set::Set Lteq::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x <= y;
 }
 
 Gteq::Gteq() : BuiltinFact("Gteq") {}
-std::unique_ptr<set::ISet> Gteq::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->gteq(*y, ctx.sets.at("bool").get());
+set::Set Gteq::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x >= y;
 }
 
 And::And() : BuiltinFact("And") {}
-std::unique_ptr<set::ISet> And::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->logicalAnd(*y, ctx.sets.at("bool").get());
+set::Set And::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x && y;
 }
 
 Or::Or() : BuiltinFact("Or") {}
-std::unique_ptr<set::ISet> Or::solve(Context &ctx) const {
-    auto const &facts = ctx.params.top()->cast<set::Sets>();
-    auto const &x = facts.at("x");
-    auto const &y = facts.at("y");
-    if (!x || !y) return nullptr;
-    return x->logicalOr(*y, ctx.sets.at("bool").get());
+set::Set Or::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &x = facts.set.extract("x");
+    auto const &y = facts.set.extract("y");
+    if (!x.ok() || !y.ok()) return set::create();
+    return x || y;
 }
 
 } // namespace builtinModules

@@ -154,7 +154,7 @@ struct Token : Node {
     Token(Kind kind, std::string_view view);
     virtual ~Token() = default;
 
-    virtual std::unique_ptr<set::ISet> solve(Context &ctx) const { return (void)ctx, nullptr; }
+    virtual set::Set solve(Context &ctx) const { return (void)ctx, set::create(); }
     virtual void dump(size_t indent = 0) const;
     template <typename T> T &cast() { return *static_cast<T *>(this); }
     template <typename T> T const &cast() const { return *static_cast<T const *>(this); }
@@ -175,15 +175,16 @@ struct Set : Token {
     void setSuperset(std::unique_ptr<Token> &&set);
     Token *getSuperset();
     std::string value() const { return std::string(view); }
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
 private:
     std::unique_ptr<Token> _annotation;
 };
 
 template <typename Derived> struct BaseSet : Token {
+    BaseSet(Node node) : Token(Kind::Number, node) {}
     BaseSet(std::string_view view) : Token(Kind::Number, view) {}
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override { std::cout << std::string(indent * 2, ' ') << view << "\n"; }
 };
 
@@ -201,17 +202,31 @@ struct Int : BaseSet<Int> {
     int value() const { return std::stoi(std::string(view)); }
 };
 
+struct Void : BaseSet<Void> {
+    using BaseSet::BaseSet;
+    using Set = set::Void;
+    constexpr static auto name = "void";
+};
+
 class Statements;
+class Fact;
 
 class Module : public Token {
 public:
+    struct Facts {
+        Facts(std::string name) : name(std::move(name)) {}
+        std::string name;
+        std::multimap<std::string, node::Fact *> facts;
+    };
+
     Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name);
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setName(std::string const &name);
     void setName(std::string_view const &name);
     std::string const &getName() const;
-    set::Module getFacts() const;
+    Facts getFacts() const;
+    set::Set extract(std::string const &name, Context &ctx) const;
     Module const *find(std::string const &name) const;
 private:
     std::unique_ptr<Statements> _stmts;
@@ -225,7 +240,7 @@ public:
     void pushFront(std::unique_ptr<Token> &&stmt);
     void pushBack(std::unique_ptr<Token> &&stmt);
     void dump(size_t indent = 0) const override;
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     std::deque<std::unique_ptr<Token>> const &get() const { return _statements; }
 private:
     std::deque<std::unique_ptr<Token>> _statements;
@@ -239,7 +254,7 @@ public:
         std::string_view module = "",
         std::unique_ptr<Token> &&stmts = std::make_unique<Statements>()
     );
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setModuleName(std::string_view name);
     std::string_view getModuleName() const;
@@ -252,7 +267,7 @@ private:
 class Unary : public Token {
 public:
     Unary(Token const &op) : Token(Kind::Unary, op), _op(op.kind) {}
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setParam(std::unique_ptr<Token> &&param);
 private:
@@ -263,7 +278,7 @@ private:
 class Binary : public Token {
 public:
     Binary(Token const &op) : Token(Kind::Binary, op), _op(op.kind) {}
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void competedLhs(std::unique_ptr<Token> &&param);
     void setLhs(std::unique_ptr<Token> &&param);
@@ -277,7 +292,7 @@ private:
 class Fact : public Token {
 public:
     Fact(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue);
-    std::unique_ptr<set::ISet> solve(Context &ctx) const override;
+    set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     Set const &lvalue() const { return *_lvalue; }
     Token const &rvalue() const { return *_rvalue; }
@@ -291,13 +306,23 @@ private:
 struct Context {
     Context(std::string const &file);
     std::map<std::string, node::Module *> modules;
-    set::Sets sets;
-    std::stack<std::unique_ptr<set::Sets>> params;
+    set::Sets global;
+    struct Params {
+        Params(node::Module const &module, set::Set &&set = set::create<set::Sets>())
+            : module(module), set(std::move(set)) {}
+        node::Module const &module;
+        set::Set set;
+    };
+    std::stack<Params> params;
     std::string const &file;
 private:
     std::vector<std::unique_ptr<node::Module>> _modules;
 };
 
-template <typename Derived> std::unique_ptr<set::ISet> node::BaseSet<Derived>::solve(Context &ctx) const {
-    return std::make_unique<typename Derived::Set>(cast<Derived>().value(), ctx.sets.at(Derived::name).get());
+template <typename Derived> set::Set node::BaseSet<Derived>::solve(Context & /*ctx*/) const {
+    if constexpr (std::is_same_v<typename Derived::Set, set::Void>) {
+        return set::create<typename Derived::Set>();
+    } else {
+        return set::create<typename Derived::Set>(cast<Derived>().value());
+    }
 }

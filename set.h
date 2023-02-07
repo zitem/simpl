@@ -391,7 +391,7 @@ public:
     $ operator!=(Interface const &set) const override { return _set != set; }
     $ contains(Interface const &set) const override { return _set.contains(set); }
     bool ok() const override { return true; }
-    $ extract(std::string const & name) const override { return _set.extract(name); }
+    $ extract(std::string const &name) const override { return _set.extract(name); }
 
     $ clone() const override { return std::make_unique<Ref>(_set); }
     std::string show() const override { return _set.show(); }
@@ -427,13 +427,13 @@ public:
     }
 
     $ extract(std::string const &name) const override;
-    void add(std::string const &name, $ &&set) { _data.insert({name, std::move(set)}); }
+    void add(std::string_view const &name, $ &&set) { _data.insert({name, std::move(set)}); }
 
     $ clone() const override { return std::make_unique<Ref>(thisset()); }
     std::string show() const override { return "sets"; }
 
 private:
-    std::map<std::string, $> _data;
+    std::map<std::string_view, $> _data;
 };
 
 // impl

@@ -216,7 +216,7 @@ public:
     struct Facts {
         Facts(std::string name) : name(std::move(name)) {}
         std::string name;
-        std::multimap<std::string, node::Fact *> facts;
+        std::multimap<std::string_view, node::Fact *> facts;
     };
 
     Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name);
@@ -305,7 +305,7 @@ private:
 
 struct Context {
     Context(std::string const &file);
-    std::map<std::string, node::Module *> modules;
+    std::map<std::string_view, std::unique_ptr<node::Module>> modules;
     set::Sets global;
     struct Params {
         Params(node::Module const &module, set::Set &&set = set::create<set::Sets>())
@@ -315,8 +315,6 @@ struct Context {
     };
     std::stack<Params> params;
     std::string const &file;
-private:
-    std::vector<std::unique_ptr<node::Module>> _modules;
 };
 
 template <typename Derived> set::Set node::BaseSet<Derived>::solve(Context & /*ctx*/) const {

@@ -2,43 +2,22 @@
 
 namespace builtinModules {
 
-std::vector<std::unique_ptr<node::Module>> all() {
-    static std::string_view const VIEW{"built-in module"};
-    std::vector<std::unique_ptr<node::Module>> res;
-    auto push = [&res](auto ptr) {
-        auto stmt = std::make_unique<node::Statements>();
-        auto const &name = ptr->name;
-        stmt->pushBack(std::move(ptr));
-        auto module = std::make_unique<node::Module>(std::move(stmt), VIEW, name);
-        res.push_back(std::move(module));
-    };
-    push(std::make_unique<Contains>());
-    push(std::make_unique<If>());
-    push(std::make_unique<Else>());
-    push(std::make_unique<Not>());
-    push(std::make_unique<Neg>());
-    push(std::make_unique<Eq>());
-    push(std::make_unique<Noteq>());
-    push(std::make_unique<Add>());
-    push(std::make_unique<Sub>());
-    push(std::make_unique<Mul>());
-    push(std::make_unique<Div>());
-    push(std::make_unique<Lt>());
-    push(std::make_unique<Gt>());
-    push(std::make_unique<Lteq>());
-    push(std::make_unique<Gteq>());
-    push(std::make_unique<And>());
-    push(std::make_unique<Or>());
+std::map<std::string_view, std::unique_ptr<node::Module>> all() {
+    constexpr static std::string_view const VIEW{"built-in module"};
+    std::map<std::string_view, std::unique_ptr<node::Module>> res;
+    [insert =
+         [&res]<typename T> {
+             auto fact = std::make_unique<T>();
+             auto const &name = fact->name;
+             auto stmt = std::make_unique<node::Statements>(std::move(fact));
+             auto module = std::make_unique<node::Module>(std::move(stmt), VIEW, name);
+             res.insert({name, std::move(module)});
+         }]<typename... Ts> {
+        (..., insert.operator()<Ts>());
+    }.
+    operator()<Contains, If, Else, Not, Neg, Eq, Noteq, Add, Sub, Mul, Div, Lt, Gt, Lteq, Gteq, And, Or>();
     return res;
 };
-
-std::map<std::string, node::Module *> genMap(std::vector<std::unique_ptr<node::Module>> const &all) {
-    std::map<std::string, node::Module *> res;
-    for (auto const &m : all) {
-        res[m->getFacts().facts.begin()->second->cast<BuiltinFact>().name] = &*m;
-    }
-    return res;
-}
 
 BuiltinFact::BuiltinFact(std::string name)
     : Fact(std::make_unique<node::Set>("extract"), nullptr), name(std::move(name)) {}

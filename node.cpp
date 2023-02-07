@@ -125,8 +125,7 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {"GEpsilon",           "GEpsilon"},
 };
 
-Context::Context(std::string const &file) : _modules(builtinModules::all()), file(file) {
-    modules = builtinModules::genMap(_modules);
+Context::Context(std::string const &file) : modules(builtinModules::all()), file(file) {
     global.add("bool", set::create<set::Ref>(set::Bool::super).move());
     global.add("int", set::create<set::Ref>(set::Int::super).move());
 }
@@ -234,7 +233,7 @@ set::Set Expression::solve(Context &ctx) const {
     }
     Module const *module{};
     if (auto findBuiltin = ctx.modules.find(name); findBuiltin != ctx.modules.end()) {
-        module = findBuiltin->second;
+        module = findBuiltin->second.get();
     }
     if (auto const *find = params.module.find(name)) {
         if (module) {
@@ -251,7 +250,7 @@ set::Set Expression::solve(Context &ctx) const {
 }
 
 set::Set Unary::solve(Context &ctx) const {
-    auto *module = ctx.modules.at(_op == Kind::Exclamation ? "Not" : "Neg");
+    auto *module = ctx.modules.at(_op == Kind::Exclamation ? "Not" : "Neg").get();
     return ::solveExpr(*module, Set("extract"), *_params, ctx);
 }
 
@@ -271,7 +270,7 @@ set::Set Binary::solve(Context &ctx) const {
         {       Kind::DoubleAnd,   "And"},
         {        Kind::DoubleOr,    "Or"},
     };
-    auto *module = ctx.modules.at(TABLE.at(_op));
+    auto *module = ctx.modules.at(TABLE.at(_op)).get();
     return ::solveExpr(*module, Set("extract"), *_params, ctx);
 }
 
@@ -298,7 +297,7 @@ set::Set Statements::solve(Context &ctx) const {
     auto sets = std::make_unique<set::Sets>();
     for (auto const &s : get()) {
         auto &fact = s->cast<Fact>();
-        auto name = std::string(fact.lvalue().view);
+        auto name = fact.lvalue().view;
         auto solve = s->solve(ctx);
         sets->add(name, solve.move());
     }
@@ -438,7 +437,7 @@ Module::Facts Module::getFacts() const {
     auto m = Module::Facts(getName());
     for (auto const &s : _stmts->get()) {
         auto &fact = s->cast<Fact>();
-        auto name = std::string(fact.lvalue().view);
+        auto name = fact.lvalue().view;
         m.facts.emplace(name, &fact);
     }
     return m;

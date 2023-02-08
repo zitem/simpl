@@ -177,4 +177,17 @@ set::Set Or::solve(Context &ctx) const {
     return x || y;
 }
 
+MakeArray::MakeArray() : BuiltinFact("MakeArray") {}
+set::Set MakeArray::solve(Context &ctx) const {
+    auto const &facts = ctx.params.top();
+    auto const &super = facts.set.extract("x");
+    auto const &size = facts.set.extract("y");
+    if (!super.ok()) return set::create();
+    auto arr = set::create<set::Array>();
+    if (size.ok()) {
+        arr.cast<set::Array>().resize(size.cast<set::Int>().value());
+    }
+    return arr;
+}
+
 } // namespace builtinModules

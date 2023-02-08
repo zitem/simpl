@@ -125,9 +125,11 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {"GEpsilon",           "GEpsilon"},
 };
 
-Context::Context(std::string const &file) : modules(builtinModules::all()), file(file) {
-    global.add("bool", set::create<set::Ref>(set::Bool::super).move());
-    global.add("int", set::create<set::Ref>(set::Int::super).move());
+Context::Context(std::string const &file)
+    : modules(builtinModules::all()), file(file), global(set::create<set::Sets>()) {
+    auto &sets = global.cast<set::Sets>();
+    sets.add("bool", set::create<set::Ref>(set::Bool::super).move());
+    sets.add("int", set::create<set::Ref>(set::Int::super).move());
 }
 
 std::pair<Node::Pos, Node::Pos> Node::getRange(std::string const &str) const {
@@ -197,8 +199,8 @@ set::Set Set::solve(Context &ctx) const {
         }
         return local;
     }
-    if (auto global = ctx.global.extract(str()); global->ok()) {
-        if (!global->ok()) {
+    if (auto global = ctx.global.extract(str()); global.ok()) {
+        if (!global.ok()) {
             return set::create();
         }
         return global;
@@ -308,7 +310,8 @@ set::Set Module::solve(Context &ctx) const {
     ctx.params.push(*this);
     auto solve = _stmts->solve(ctx);
     ctx.params.pop();
-    return solve;
+    auto extract = solve.extract("");
+    return extract;
 }
 
 Token::Token(Kind kind, std::string_view view) : Node(view), kind(kind) {}
@@ -459,7 +462,6 @@ set::Set Module::extract(std::string const &name, Context &ctx) const {
     auto factFind = facts.facts.equal_range(name);
     auto solved = set::create();
     Fact *solvedFact;
-    std::vector<set::Set> vec;
     for (auto it = factFind.first; it != factFind.second; ++it) {
         if (auto solving = it->second->solve(ctx); solving.ok()) {
             if (solved.ok()) {

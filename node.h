@@ -306,7 +306,7 @@ private:
 struct Context {
     Context(std::string const &file);
     std::map<std::string_view, std::unique_ptr<node::Module>> modules;
-    set::Sets global;
+    set::Set global;
     struct Params {
         Params(node::Module const &module, set::Set &&set = set::create<set::Sets>())
             : module(module), set(std::move(set)) {}

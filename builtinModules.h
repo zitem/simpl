@@ -95,4 +95,9 @@ struct Or : BuiltinFact {
     set::Set solve(Context &ctx) const override;
 };
 
+struct MakeArray : BuiltinFact {
+    MakeArray();
+    set::Set solve(Context &ctx) const override;
+};
+
 } // namespace builtinModules

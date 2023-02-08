@@ -7,6 +7,11 @@ using $ = std::unique_ptr<Interface>;
 
 template <typename T> concept derived = (std::derived_from<T, Interface> && !std::is_same_v<T, Interface>);
 
+class Set;
+class Failure;
+
+template <typename S = Failure, typename... Args> static Set create(Args &&...args);
+
 struct Interface {
     virtual ~Interface() = default;
 
@@ -32,7 +37,7 @@ struct Interface {
     virtual $ contains(Interface const &set) const = 0;
     virtual bool ok() const = 0;
 
-    virtual $ extract(std::string const &name) const = 0;
+    virtual $ extract(std::string_view name) const = 0;
 
     virtual $ clone() const = 0;
     virtual std::string show() const = 0;
@@ -67,7 +72,7 @@ public:
     Set operator!=(Set const &set) const { return *_set != *set._set; }
     Set contains(Set const &set) const { return _set->contains(*set._set); }
     bool ok() const { return _set->ok(); }
-    Set extract(std::string const &name) const { return _set->extract(name); }
+    Set extract(std::string_view name) const { return _set->extract(name); }
     Set clone() const { return _set->clone(); }
     std::string show() const { return _set->show(); }
 
@@ -99,7 +104,7 @@ struct Identity : Interface {
     $ operator!=(Interface const &set) const override;
     $ contains(Interface const &set) const override { return thisset() == set.superset(); }
     bool ok() const override { return true; }
-    $ extract(std::string const &name) const override;
+    $ extract(std::string_view name) const override;
 
     $ clone() const override;
 
@@ -130,7 +135,7 @@ struct Failure : Interface {
     $ operator!=(Interface const & /*set*/) const override { return clone(); }
     $ contains(Interface const & /*set*/) const override { return clone(); }
     bool ok() const override { return false; }
-    $ extract(std::string const & /*name*/) const override { return clone(); }
+    $ extract(std::string_view /*name*/) const override { return clone(); }
 
     $ clone() const override { return std::make_unique<Failure>(msg); }
     std::string show() const override { return msg; }
@@ -161,7 +166,7 @@ struct Void : Interface {
     $ operator!=(Interface const &set) const override { return id != set; }
     $ contains(Interface const &set) const override { return id == set; }
     bool ok() const override { return true; }
-    $ extract(std::string const & /*name*/) const override { return std::make_unique<Failure>(); }
+    $ extract(std::string_view /*name*/) const override { return std::make_unique<Failure>(); }
 
     $ clone() const override { return std::make_unique<Void>(); }
     std::string show() const override { return "void"; }
@@ -190,7 +195,7 @@ struct Universe : Interface {
     $ operator!=(Interface const &set) const override { return id != set; }
     $ contains(Interface const & /*set*/) const override;
     bool ok() const override { return true; }
-    $ extract(std::string const & /*name*/) const override { return std::make_unique<Failure>(); }
+    $ extract(std::string_view /*name*/) const override { return std::make_unique<Failure>(); }
 
     $ clone() const override { return std::make_unique<Universe>(); }
     std::string show() const override { return "universe"; }
@@ -316,7 +321,7 @@ public:
 
     bool ok() const override { return true; }
 
-    $ extract(std::string const & /*name*/) const override { return std::make_unique<Failure>(); }
+    $ extract(std::string_view /*name*/) const override { return std::make_unique<Failure>(); }
 
     $ clone() const override { return std::make_unique<Base<T>>(*this); }
 
@@ -361,7 +366,7 @@ struct Every : Interface {
     $ operator!=(Interface const & /*set*/) const override { return std::make_unique<Void>(); }
     $ contains(const Interface & /*set*/) const override { return std::make_unique<Bool>(true); }
     bool ok() const override { return true; }
-    $ extract(std::string const & /*name*/) const override { return std::make_unique<Failure>(); }
+    $ extract(std::string_view /*name*/) const override { return std::make_unique<Failure>(); }
 
     $ clone() const override { return std::make_unique<Every>(); }
     std::string show() const override { return "everyset"; }
@@ -391,7 +396,7 @@ public:
     $ operator!=(Interface const &set) const override { return _set != set; }
     $ contains(Interface const &set) const override { return _set.contains(set); }
     bool ok() const override { return true; }
-    $ extract(std::string const &name) const override { return _set.extract(name); }
+    $ extract(std::string_view name) const override { return _set.extract(name); }
 
     $ clone() const override { return std::make_unique<Ref>(_set); }
     std::string show() const override { return _set.show(); }
@@ -419,15 +424,24 @@ public:
     $ operator||(Interface const & /*set*/) const override { return nullptr; }
     $ operator&&(Interface const & /*set*/) const override { return nullptr; }
 
-    $ operator==(Interface const & /*set*/) const override { return nullptr; }
+    $ operator==(Interface const &set) const override {
+        if (&superset() != &set.superset()) {
+            return std::make_unique<Bool>(false);
+        }
+        $ res = std::make_unique<Bool>(true);
+        for (auto const &[k, v] : set.thisset().cast<Sets>()._data) {
+            res = *res && *(*_data.at(k) == *v);
+        }
+        return res;
+    }
     $ operator!=(Interface const & /*set*/) const override { return nullptr; }
     $ contains(Interface const & /*set*/) const override { return nullptr; }
     bool ok() const override {
         return std::ranges::all_of(_data, [](auto const &pair) { return pair.second->ok(); });
     }
 
-    $ extract(std::string const &name) const override;
-    void add(std::string_view const &name, $ &&set) { _data.insert({name, std::move(set)}); }
+    $ extract(std::string_view name) const override;
+    void add(std::string_view name, $ &&set) { _data.insert({name, std::move(set)}); }
 
     $ clone() const override { return std::make_unique<Ref>(thisset()); }
     std::string show() const override { return "sets"; }
@@ -436,9 +450,56 @@ private:
     std::map<std::string_view, $> _data;
 };
 
+class Array : public Interface {
+public:
+    Interface const &thisset() const override { return *this; }
+    Interface const &superset() const override { return Universe::id; }
+
+    $ operator+(Interface const & /*set*/) const override { return nullptr; }
+    $ operator-(Interface const & /*set*/) const override { return nullptr; }
+    $ operator*(Interface const & /*set*/) const override { return nullptr; }
+    $ operator/(Interface const & /*set*/) const override { return nullptr; }
+    $ operator!() const override { return nullptr; }
+    $ operator-() const override { return nullptr; }
+
+    $ operator<(Interface const & /*set*/) const override { return nullptr; }
+    $ operator>(Interface const & /*set*/) const override { return nullptr; }
+    $ operator<=(Interface const & /*set*/) const override { return nullptr; }
+    $ operator>=(Interface const & /*set*/) const override { return nullptr; }
+    $ operator||(Interface const & /*set*/) const override { return nullptr; }
+    $ operator&&(Interface const & /*set*/) const override { return nullptr; }
+
+    $ operator==(Interface const &set) const override {
+        if (&superset() != &set.superset()) {
+            return std::make_unique<Bool>(false);
+        }
+        $ res = std::make_unique<Bool>(true);
+        auto const &array = set.thisset().cast<Array>()._data;
+        for (auto i = 0; i < array.size(); ++i) {
+            res = *res && *(*_data[i] == *array[i]);
+        }
+        return res;
+    }
+    $ operator!=(Interface const & /*set*/) const override { return nullptr; }
+    $ contains(Interface const & /*set*/) const override { return nullptr; }
+    bool ok() const override {
+        return std::ranges::all_of(_data, [](auto const &ele) { return ele->ok(); });
+    }
+
+    void append($ &&set) { _data.push_back(std::move(set)); }
+    void set(size_t idx, $ &&set) { _data[idx] = std::move(set); }
+    void resize(size_t size) { _data.resize(size); }
+
+    $ extract(std::string_view /*name*/) const override { return nullptr; }
+    $ clone() const override { return std::make_unique<Ref>(thisset()); }
+    std::string show() const override { return "array"; }
+private:
+    std::vector<$> _data;
+};
+
 // impl
 
-template <typename S = Failure, typename... Args> static Set create(Args &&...args) {
+template <typename S, typename... Args> static Set create(Args &&...args) {
     return Set{std::make_unique<S>(std::forward<Args>(args)...)};
 }
 
@@ -516,7 +577,7 @@ inline $ Identity::operator==(Interface const &set) const {
     return std::make_unique<Bool>(this == &set.thisset());
 }
 
-inline $ Identity::extract(std::string const & /*name*/) const {
+inline $ Identity::extract(std::string_view /*name*/) const {
     return std::make_unique<Failure>();
 }
 
@@ -539,7 +600,16 @@ inline $ Universe::contains(Interface const & /*set*/) const {
 }
 
 // Sets
-inline $ Sets::extract(std::string const &name) const {
+inline $ Sets::extract(std::string_view name) const {
+    if (name.empty()) {
+        auto res = std::make_unique<Sets>();
+        for (auto const &[k, v] : _data) {
+            if (v->ok()) {
+                res->_data.insert({k, v->clone()});
+            }
+        }
+        return res;
+    }
     auto findset = _data.find(name);
     if (findset != _data.end()) {
         return findset->second->clone();

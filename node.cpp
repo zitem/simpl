@@ -351,6 +351,10 @@ std::string_view Expression::getModuleName() const {
     return _module;
 }
 
+std::string_view Expression::getExtractName() const {
+    return _extract->view;
+}
+
 void Unary::setParam(std::unique_ptr<Token> &&param) {
     view = combine(*param).view;
     auto factView = param->view;

@@ -282,7 +282,7 @@ void Parser::_solveReference(Kind k) {
     if (find == _follow.end()) {
         _follow[k];
         find = _follow.find(k);
-        Quiet<style::yellow>(), "warn: no ", k.show(), '\n';
+        Quiet<style::yellow>(), "warn: unused symbol '", k.show(), "'\n";
     }
     auto &ref = find->second;
 

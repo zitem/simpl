@@ -258,6 +258,7 @@ public:
     void dump(size_t indent = 0) const override;
     void setModuleName(std::string_view name);
     std::string_view getModuleName() const;
+    std::string_view getExtractName() const;
 private:
     std::unique_ptr<Set> _extract;
     std::unique_ptr<Statements> _stmts;

@@ -2,9 +2,9 @@
 
 namespace builtinModules {
 
-std::map<std::string_view, std::unique_ptr<node::Module>> all() {
+node::Module::Modules all() {
     constexpr static std::string_view const VIEW{"built-in module"};
-    std::map<std::string_view, std::unique_ptr<node::Module>> res;
+    node::Module::Modules res;
     [insert =
          [&res]<typename T> {
              auto fact = std::make_unique<T>();

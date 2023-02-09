@@ -218,20 +218,22 @@ public:
         std::string name;
         std::multimap<std::string_view, node::Fact *> facts;
     };
+    using Modules = std::map<std::string_view, std::unique_ptr<Module>>;
 
     Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name);
+    Module(Modules &&modules);
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setName(std::string const &name);
     void setName(std::string_view const &name);
     std::string const &getName() const;
     Facts getFacts() const;
-    set::Set extract(std::string const &name, Context &ctx) const;
-    Module const *find(std::string const &name) const;
+    set::Set extract(std::string_view name, Context &ctx) const;
+    Module const *find(std::string_view name) const;
 private:
     std::unique_ptr<Statements> _stmts;
     std::string _name;
-    std::map<std::string_view, std::unique_ptr<Module>> _modules;
+    Modules _modules;
 };
 
 class Statements : public Token {
@@ -252,7 +254,7 @@ public:
     Expression(
         std::unique_ptr<Token> &&extract,
         std::string_view module = "",
-        std::unique_ptr<Token> &&stmts = std::make_unique<Statements>()
+        std::unique_ptr<Token> &&params = std::make_unique<Statements>()
     );
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
@@ -261,7 +263,7 @@ public:
     std::string_view getExtractName() const;
 private:
     std::unique_ptr<Set> _extract;
-    std::unique_ptr<Statements> _stmts;
+    std::unique_ptr<Statements> _params;
     std::string_view _module;
 };
 
@@ -306,7 +308,7 @@ private:
 
 struct Context {
     Context(std::string const &file);
-    std::map<std::string_view, std::unique_ptr<node::Module>> modules;
+    node::Module std;
     set::Set global;
     struct Params {
         Params(node::Module const &module, set::Set &&set = set::create<set::Sets>())

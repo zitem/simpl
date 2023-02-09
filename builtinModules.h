@@ -3,7 +3,7 @@
 
 namespace builtinModules {
 
-std::map<std::string_view, std::unique_ptr<node::Module>> all();
+node::Module::Modules all();
 
 struct BuiltinFact : node::Fact {
     BuiltinFact(std::string name);

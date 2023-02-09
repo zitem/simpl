@@ -335,10 +335,16 @@ Token *Set::getSuperset() {
 }
 
 Expression::Expression(std::unique_ptr<Token> &&extract, std::string_view module, std::unique_ptr<Token> &&params)
-    : Token(Kind::Expr, params->combine(*extract)),
-      _extract(&extract.release()->cast<Set>()),
-      _params(&params.release()->cast<Statements>()),
+    : Token(Kind::Expr, module),
+      _extract(extract ? &extract.release()->cast<Set>() : nullptr),
+      _params(
+          params ? std::unique_ptr<Statements>(&params.release()->cast<Statements>()) : std::make_unique<Statements>()
+      ),
       _module(module) {}
+
+void Expression::setExtract(std::unique_ptr<Token> &&extract) {
+    _extract.reset(&extract.release()->cast<Set>());
+}
 
 void Expression::setModuleName(std::string_view name) {
     _module = name;
@@ -495,7 +501,7 @@ void Set::dump(size_t indent) const {
 }
 
 void Expression::dump(size_t indent) const {
-    std::cout << std::string(indent * 2, ' ') << "expr\n";
+    std::cout << std::string(indent * 2, ' ') << "extract from " << _module << "\n";
     if (_extract) _extract->dump(indent + 1);
     if (_params) _params->dump(indent + 1);
 }
@@ -525,4 +531,7 @@ void Statements::dump(size_t indent) const {
 void Module::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "module " << getName() << "\n";
     _stmts->dump(indent + 1);
+    for (auto const &m : _modules) {
+        m.second->dump(indent + 1);
+    }
 }

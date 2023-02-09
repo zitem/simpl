@@ -1,4 +1,10 @@
-main: int = Fib(index = 8).res, // result is 21
+main: int = res : Fib(index = four * 2), // result is 21
+
+four = val : Get(mod = Four),
+
+module Get { val = val : mod() },
+
+module Four { val = 4 },
 
 module Fib {
     index,
@@ -6,8 +12,9 @@ module Fib {
     a = 0,
     b = 1, 
     c = a + b,
+    idx: if = index - 1,
 
-    if = If(v = index > 2).extract,
-    res = Fib(index: if = index - 1, a = b, b = c).res,
+    if = extract : If(v = index > 2),
+    res = res : Fib(index = idx, a = b, b = c),
     res: !if = c,
 },

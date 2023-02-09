@@ -50,8 +50,7 @@ Op5     ::= == <+> != <$>
 Op6     ::= | <+> || <+> & <+> && <$>
 
 Extract ::= epsilon
-        <+> ( Stmt ) . Id
-        <+> . Id
+        <+> : Id ( Stmt ) Extract
         <$>
 
 Annot   ::= epsilon

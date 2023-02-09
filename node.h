@@ -258,6 +258,7 @@ public:
     );
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
+    void setExtract(std::unique_ptr<Token> &&extract);
     void setModuleName(std::string_view name);
     std::string_view getModuleName() const;
     std::string_view getExtractName() const;

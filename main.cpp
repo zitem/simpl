@@ -58,7 +58,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
         }
         case Kind::Id:
             if (auto expr = genAst(nonterm(1), ctx)) {
-                expr->cast<node::Expression>().setModuleName(nonterm(0).view);
+                expr->cast<node::Expression>().setExtract(genAst(nonterm(0), ctx));
                 return expr;
             }
             return genAst(nonterm(0), ctx);
@@ -111,11 +111,8 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
     case Kind::Extract:
         switch (get(0)->kind.value()) {
         case Kind::Epsilon: return nullptr;
-        case Kind::OpenParenthesis:
-            return std::make_unique<node::Expression>(
-                genAst(nonterm(4), ctx), get(0)->combine(*get(4)).view, genAst(nonterm(1), ctx)
-            );
-        case Kind::Dot: return std::make_unique<node::Expression>(genAst(nonterm(1), ctx));
+        case Kind::SingleColon:
+            return std::make_unique<node::Expression>(genAst(nonterm(5), ctx), get(1)->view, genAst(nonterm(3), ctx));
         }
 
     case Kind::Annot: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);

@@ -25,8 +25,8 @@ BuiltinFact::BuiltinFact(std::string name)
 Contains::Contains() : BuiltinFact("Contains") {}
 set::Set Contains::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x.contains(y);
 }
@@ -34,7 +34,7 @@ set::Set Contains::solve(Context &ctx) const {
 If::If() : BuiltinFact("If") {}
 set::Set If::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &v = facts.set.extract("v");
+    auto const &v = facts.extract("v");
     if (!v.ok()) return set::create();
     if (v.cast<set::Bool>().value()) {
         return set::create<set::Universe>();
@@ -45,7 +45,7 @@ set::Set If::solve(Context &ctx) const {
 Else::Else() : BuiltinFact("Else") {}
 set::Set Else::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &v = facts.set.extract("v");
+    auto const &v = facts.extract("v");
     if (!v.ok()) return set::create();
     if (!v.cast<set::Bool>().value()) {
         return set::create<set::Universe>();
@@ -56,7 +56,7 @@ set::Set Else::solve(Context &ctx) const {
 Not::Not() : BuiltinFact("Not") {}
 set::Set Not::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &v = facts.set.extract("v");
+    auto const &v = facts.extract("v");
     if (!v.ok()) return set::create();
     return !v;
 }
@@ -64,7 +64,7 @@ set::Set Not::solve(Context &ctx) const {
 Neg::Neg() : BuiltinFact("Neg") {}
 set::Set Neg::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &v = facts.set.extract("v");
+    auto const &v = facts.extract("v");
     if (!v.ok()) return set::create();
     return -v;
 }
@@ -72,8 +72,8 @@ set::Set Neg::solve(Context &ctx) const {
 Eq::Eq() : BuiltinFact("Eq") {}
 set::Set Eq::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x == y;
 }
@@ -81,8 +81,8 @@ set::Set Eq::solve(Context &ctx) const {
 Noteq::Noteq() : BuiltinFact("Noteq") {}
 set::Set Noteq::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x != y;
 }
@@ -90,8 +90,8 @@ set::Set Noteq::solve(Context &ctx) const {
 Add::Add() : BuiltinFact("Add") {}
 set::Set Add::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x + y;
 }
@@ -99,8 +99,8 @@ set::Set Add::solve(Context &ctx) const {
 Sub::Sub() : BuiltinFact("Sub") {}
 set::Set Sub::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x - y;
 }
@@ -108,8 +108,8 @@ set::Set Sub::solve(Context &ctx) const {
 Mul::Mul() : BuiltinFact("Mul") {}
 set::Set Mul::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x * y;
 }
@@ -117,8 +117,8 @@ set::Set Mul::solve(Context &ctx) const {
 Div::Div() : BuiltinFact("Div") {}
 set::Set Div::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x / y;
 }
@@ -126,8 +126,8 @@ set::Set Div::solve(Context &ctx) const {
 Lt::Lt() : BuiltinFact("Lt") {}
 set::Set Lt::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x < y;
 }
@@ -135,8 +135,8 @@ set::Set Lt::solve(Context &ctx) const {
 Gt::Gt() : BuiltinFact("Gt") {}
 set::Set Gt::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x > y;
 }
@@ -144,8 +144,8 @@ set::Set Gt::solve(Context &ctx) const {
 Lteq::Lteq() : BuiltinFact("Lteq") {}
 set::Set Lteq::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x <= y;
 }
@@ -153,8 +153,8 @@ set::Set Lteq::solve(Context &ctx) const {
 Gteq::Gteq() : BuiltinFact("Gteq") {}
 set::Set Gteq::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x >= y;
 }
@@ -162,8 +162,8 @@ set::Set Gteq::solve(Context &ctx) const {
 And::And() : BuiltinFact("And") {}
 set::Set And::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x && y;
 }
@@ -171,8 +171,8 @@ set::Set And::solve(Context &ctx) const {
 Or::Or() : BuiltinFact("Or") {}
 set::Set Or::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &x = facts.set.extract("x");
-    auto const &y = facts.set.extract("y");
+    auto const &x = facts.extract("x");
+    auto const &y = facts.extract("y");
     if (!x.ok() || !y.ok()) return set::create();
     return x || y;
 }
@@ -180,8 +180,8 @@ set::Set Or::solve(Context &ctx) const {
 MakeArray::MakeArray() : BuiltinFact("MakeArray") {}
 set::Set MakeArray::solve(Context &ctx) const {
     auto const &facts = ctx.params.top();
-    auto const &super = facts.set.extract("x");
-    auto const &size = facts.set.extract("y");
+    auto const &super = facts.extract("x");
+    auto const &size = facts.extract("y");
     if (!super.ok()) return set::create();
     auto arr = set::create<set::Array>();
     if (size.ok()) {

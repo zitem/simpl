@@ -116,6 +116,8 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {   "Exp7_",              "Exp7_"},
     {   "Exp8_",              "Exp8_"},
     {   "Exp9_",              "Exp9_"},
+    {   "Super",              "Super"},
+    {  "Params",             "Params"},
 
     {   "GRoot",              "GRoot"},
     {   "GFact",              "GFact"},
@@ -189,25 +191,22 @@ void Node::printCode(std::string const &file) const {
 
 set::Set Set::solve(Context &ctx) const {
     auto &params = ctx.params.top();
-    if (!params.set.ok()) {
+    if (!params.ok()) {
         return set::create();
     }
-    if (auto local = params.set.extract(view); local.ok()) {
-        if (!local.ok()) {
-            return set::create();
-        }
+    if (auto local = params.extract(view); local.ok()) {
         return local;
     }
     if (auto global = ctx.global.extract(view); global.ok()) {
-        if (!global.ok()) {
-            return set::create();
-        }
         return global;
     }
-    if (auto solved = params.module.extract(view, ctx); solved.ok()) {
+    if (auto solved = params.cast<set::Sets>().module->extract(view, ctx); solved.ok()) {
         return solved;
     }
-    if (auto const *modFind = params.module.find(view)) {
+    if (auto const *modFind = ctx.std.find(view)) {
+        return modFind->solve(ctx);
+    }
+    if (auto const *modFind = params.cast<set::Sets>().module->find(view)) {
         return modFind->solve(ctx);
     }
     Quiet<style::yellow>(), "undefined extract '", view, "'\n";
@@ -218,35 +217,23 @@ set::Set Set::solve(Context &ctx) const {
 
 set::Set solveExpr(Module const &module, Set const &extract, Statements const &params, Context &ctx) {
     auto p = params.solve(ctx);
-    ctx.params.push({module, std::move(p)});
+    p.cast<set::Sets>().module = &module;
+    ctx.params.push(std::move(p));
     auto solve = extract.solve(ctx);
     ctx.params.pop();
     return solve;
 }
 
 set::Set Expression::solve(Context &ctx) const {
-    auto const &params = ctx.params.top();
-    if (auto ex = params.set.extract(_module); ex.ok()) {
-        if (auto e = ex.extract(_extract->value()); e.ok()) {
-            return e;
-        }
+    if (!_super) {
+        return _extract->solve(ctx);
     }
-    Module const *module{};
-    if (auto const *findBuiltin = ctx.std.find(_module)) {
-        module = findBuiltin;
+    if (auto const *module = _super->solve(ctx).cast<set::Sets>().module) {
+        return ::solveExpr(*module, *_extract, *_params, ctx);
     }
-    if (auto const *find = params.module.find(_module)) {
-        if (module) {
-            Quiet<style::yellow>(), "overwrite built-in module '", _module, "'\n";
-        }
-        module = find;
-    }
-    if (!module) {
-        Quiet<style::red>(), "undeclared module '", _module, "'\n";
-        _params->printCode(ctx.file);
-        return set::create();
-    }
-    return ::solveExpr(*module, *_extract, *_params, ctx);
+    Quiet<style::red>(), "undeclared module '", "'\n";
+    _params->printCode(ctx.file);
+    return set::create();
 }
 
 set::Set Unary::solve(Context &ctx) const {
@@ -305,10 +292,12 @@ set::Set Statements::solve(Context &ctx) const {
 }
 
 set::Set Module::solve(Context &ctx) const {
-    ctx.params.push(*this);
-    auto solve = _stmts->solve(ctx);
-    ctx.params.pop();
+    auto solve = set::create<set::Sets>();
+    for (auto const &m : _modules) {
+        solve.cast<set::Sets>().add(m.first, m.second->solve(ctx).move());
+    }
     auto extract = solve.extract("");
+    extract.cast<set::Sets>().module = this;
     return extract;
 }
 
@@ -334,25 +323,31 @@ Token *Set::getSuperset() {
     return _annotation.get();
 }
 
-Expression::Expression(std::unique_ptr<Token> &&extract, std::string_view module, std::unique_ptr<Token> &&params)
-    : Token(Kind::Expr, module),
-      _extract(extract ? &extract.release()->cast<Set>() : nullptr),
-      _params(
-          params ? std::unique_ptr<Statements>(&params.release()->cast<Statements>()) : std::make_unique<Statements>()
-      ),
-      _module(module) {}
+Expression::Expression(
+    std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&params, std::unique_ptr<Token> &&super
+)
+    : Token(Kind::Expr, extract->view), _extract(&extract.release()->cast<Set>()) {
+    if (params) {
+        _params.reset(&params.release()->cast<Statements>());
+        view = combine(*_params).view;
+    } else {
+        _params = std::make_unique<Statements>();
+    }
+    if (super) {
+        _super = std::move(super);
+        view = combine(*_super).view;
+    } else {
+        _super = nullptr;
+    }
+}
 
 void Expression::setExtract(std::unique_ptr<Token> &&extract) {
     _extract.reset(&extract.release()->cast<Set>());
 }
 
-void Expression::setModuleName(std::string_view name) {
-    _module = name;
-    view = Node(name).combine(view).view;
-}
-
-std::string_view Expression::getModuleName() const {
-    return _module;
+void Expression::setSuperset(std::unique_ptr<Token> &&super) {
+    _super = std::move(super);
+    view = combine(*super).view;
 }
 
 std::string_view Expression::getExtractName() const {
@@ -501,7 +496,7 @@ void Set::dump(size_t indent) const {
 }
 
 void Expression::dump(size_t indent) const {
-    std::cout << std::string(indent * 2, ' ') << "extract from " << _module << "\n";
+    std::cout << std::string(indent * 2, ' ') << "extract from " << _super << "\n";
     if (_extract) _extract->dump(indent + 1);
     if (_params) _params->dump(indent + 1);
 }

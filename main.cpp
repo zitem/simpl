@@ -56,14 +56,14 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
             lexp->cast<node::Unary>().setParam(genAst(nonterm(1), ctx));
             return lexp;
         }
-        case Kind::Id:
-            if (auto expr = genAst(nonterm(1), ctx)) {
-                expr->cast<node::Expression>().setExtract(genAst(nonterm(0), ctx));
-                return expr;
-            }
-            return genAst(nonterm(0), ctx);
+        case Kind::Id: {
+            auto id = genAst(nonterm(0), ctx);
+            auto params = genAst(nonterm(1), ctx);
+            auto super = genAst(nonterm(2), ctx);
+            return std::make_unique<node::Expression>(std::move(id), std::move(params), std::move(super));
+        }
         case Kind::OpenParenthesis: return genAst(nonterm(1), ctx);
-        case Kind::OpenCurlyBracket: return std::make_unique<node::Void>(Node(get(0)->view).combine(*get(1)));
+        case Kind::OpenCurlyBracket: return std::make_unique<node::Void>(nonterm(0).combine(*get(1)));
         default: return genAst(nonterm(0), ctx);
         }
 
@@ -108,13 +108,18 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
     case Kind::Op5:
     case Kind::Op6: return std::make_unique<node::Binary>(*get(0));
 
-    case Kind::Extract:
+    case Kind::Super:
         switch (get(0)->kind.value()) {
         case Kind::Epsilon: return nullptr;
-        case Kind::SingleColon:
-            return std::make_unique<node::Expression>(genAst(nonterm(5), ctx), get(1)->view, genAst(nonterm(3), ctx));
+        case Kind::SingleColon: {
+            auto extract = genAst(nonterm(1), ctx);
+            auto params = genAst(nonterm(2), ctx);
+            auto super = genAst(nonterm(3), ctx);
+            return std::make_unique<node::Expression>(std::move(extract), std::move(params), std::move(super));
+        }
         }
 
+    case Kind::Params:
     case Kind::Annot: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
 
     case Kind::Id: return std::make_unique<node::Set>(self.view);
@@ -174,6 +179,7 @@ void run(char const *filename) {
             std::make_shared<Id>(Kind::Id),
             std::make_shared<Number>(Kind::Number),
             std::make_shared<StrRegion>("//", "\n", Kind::Comment),
+            std::make_shared<StrRegion>("--", "\n", Kind::Comment),
             std::make_shared<StrRegion>("/*", "*/", Kind::Comment),
         };
     }();
@@ -216,8 +222,10 @@ void run(char const *filename) {
 
     auto modulename = filename2module(filename);
     auto root = node::Module(std::move(ast), {str}, modulename);
-    ctx.params.push(root);
-    auto expr = node::Expression(std::make_unique<node::Set>("main"), modulename);
+    auto args = set::create<set::Sets>();
+    args.cast<set::Sets>().module = &root;
+    ctx.params.push(std::move(args));
+    auto expr = node::Expression(std::make_unique<node::Set>("main"), std::make_unique<node::Set>(modulename), nullptr);
     auto solved = expr.solve(ctx);
 
     // compile to llvm ir here

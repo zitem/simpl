@@ -1,5 +1,9 @@
 #pragma once
 
+namespace node {
+class Module;
+}
+
 namespace set {
 
 struct Interface;
@@ -443,8 +447,16 @@ public:
     $ extract(std::string_view name) const override;
     void add(std::string_view name, $ &&set) { _data.insert({name, std::move(set)}); }
 
-    $ clone() const override { return std::make_unique<Ref>(thisset()); }
+    $ clone() const override {
+        auto res = std::make_unique<Sets>();
+        for (auto const &[k, v] : _data) {
+            res->cast<Sets>()._data[k] = v->clone();
+        }
+        return res;
+    }
     std::string show() const override { return "sets"; }
+
+    node::Module const *module{};
 
 private:
     std::map<std::string_view, $> _data;

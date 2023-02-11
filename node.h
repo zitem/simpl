@@ -109,6 +109,8 @@ struct Kind {
         Exp7_,
         Exp8_,
         Exp9_,
+        Super,
+        Params,
 
         GRoot,
         GFact,
@@ -148,6 +150,9 @@ struct Node {
 class Context;
 
 namespace node {
+
+class Statements;
+class Fact;
 
 struct Token : Node {
     Token(Kind kind, Node const &node);
@@ -208,9 +213,6 @@ struct Void : BaseSet<Void> {
     constexpr static auto name = "void";
 };
 
-class Statements;
-class Fact;
-
 class Module : public Token {
 public:
     struct Facts {
@@ -251,21 +253,16 @@ private:
 
 class Expression : public Token {
 public:
-    Expression(
-        std::unique_ptr<Token> &&extract,
-        std::string_view module = "",
-        std::unique_ptr<Token> &&params = std::make_unique<Statements>()
-    );
+    Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&params, std::unique_ptr<Token> &&super);
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setExtract(std::unique_ptr<Token> &&extract);
-    void setModuleName(std::string_view name);
-    std::string_view getModuleName() const;
+    void setSuperset(std::unique_ptr<Token> &&super);
     std::string_view getExtractName() const;
 private:
     std::unique_ptr<Set> _extract;
     std::unique_ptr<Statements> _params;
-    std::string_view _module;
+    std::unique_ptr<Token> _super;
 };
 
 class Unary : public Token {
@@ -311,13 +308,7 @@ struct Context {
     Context(std::string const &file);
     node::Module std;
     set::Set global;
-    struct Params {
-        Params(node::Module const &module, set::Set &&set = set::create<set::Sets>())
-            : module(module), set(std::move(set)) {}
-        node::Module const &module;
-        set::Set set;
-    };
-    std::stack<Params> params;
+    std::stack<set::Set> params;
     std::string const &file;
 };
 

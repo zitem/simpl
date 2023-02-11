@@ -124,6 +124,8 @@ std::vector<std::shared_ptr<Base>> const bnfSymbols{
     std::make_shared<StrFixed>("Exp7'", Kind::Exp7_),
     std::make_shared<StrFixed>("Exp8'", Kind::Exp8_),
     std::make_shared<StrFixed>("Exp9'", Kind::Exp9_),
+    std::make_shared<StrFixed>("Super", Kind::Super),
+    std::make_shared<StrFixed>("Params", Kind::Params),
 };
 
 Parser::CFG const cfgcfg{
@@ -217,6 +219,8 @@ Parser::CFG const cfgcfg{
          {Kind::Exp7_},
          {Kind::Exp8_},
          {Kind::Exp9_},
+         {Kind::Super},
+         {Kind::Params},
 }}};
 
 void LangCFG::test() {

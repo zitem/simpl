@@ -151,14 +151,15 @@ class Context;
 
 namespace node {
 
-class Statements;
 class Fact;
+class Module;
+class Statements;
 
 struct Token : Node {
     Token(Kind kind, Node const &node);
     Token(Kind kind, std::string_view view);
     virtual ~Token() = default;
-
+    virtual Module const *digest(Context &ctx) { return (void)ctx, nullptr; } // Semantic Analyzer (instantiate)
     virtual set::Set solve(Context &ctx) const { return (void)ctx, set::create(); }
     virtual void dump(size_t indent = 0) const;
     template <typename T> T &cast() { return *static_cast<T *>(this); }
@@ -180,8 +181,11 @@ struct Set : Token {
     void setSuperset(std::unique_ptr<Token> &&set);
     Token *getSuperset();
     std::string value() const { return std::string(view); }
+    Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
+    Module const *ref{};
+    std::vector<Fact const *> facts;
 private:
     std::unique_ptr<Token> _annotation;
 };
@@ -224,13 +228,13 @@ public:
 
     Module(std::unique_ptr<Token> &&statements, Node const &node, std::string name);
     Module(Modules &&modules);
+    Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setName(std::string const &name);
     void setName(std::string_view const &name);
     std::string const &getName() const;
     Facts getFacts() const;
-    set::Set extract(std::string_view name, Context &ctx) const;
     Module const *find(std::string_view name) const;
 private:
     std::unique_ptr<Statements> _stmts;
@@ -254,31 +258,36 @@ private:
 class Expression : public Token {
 public:
     Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&params, std::unique_ptr<Token> &&super);
+    Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setExtract(std::unique_ptr<Token> &&extract);
     void setSuperset(std::unique_ptr<Token> &&super);
     std::string_view getExtractName() const;
+    Module const *getModule() const;
 private:
     std::unique_ptr<Set> _extract;
     std::unique_ptr<Statements> _params;
-    std::unique_ptr<Token> _super;
+    std::unique_ptr<Expression> _super;
 };
 
 class Unary : public Token {
 public:
     Unary(Token const &op) : Token(Kind::Unary, op), _op(op.kind) {}
+    Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setParam(std::unique_ptr<Token> &&param);
 private:
     std::unique_ptr<Statements> _params;
+    Module const* _ref{};
     Kind _op;
 };
 
 class Binary : public Token {
 public:
     Binary(Token const &op) : Token(Kind::Binary, op), _op(op.kind) {}
+    Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void competedLhs(std::unique_ptr<Token> &&param);
@@ -287,12 +296,14 @@ public:
 private:
     std::unique_ptr<Statements> _params = std::make_unique<Statements>();
     Binary *_binaryLhs{};
+    Module const* _ref{};
     Kind _op;
 };
 
 class Fact : public Token {
 public:
     Fact(std::unique_ptr<Token> &&lvalue, std::unique_ptr<Token> &&rvalue);
+    Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     Set const &lvalue() const { return *_lvalue; }
@@ -309,6 +320,7 @@ struct Context {
     node::Module std;
     set::Set global;
     std::stack<set::Set> params;
+    std::stack<node::Module const *> scope;
     std::string const &file;
 };
 

@@ -189,59 +189,64 @@ void Node::printCode(std::string const &file) const {
     std::cout << std::flush;
 }
 
-set::Set Set::solve(Context &ctx) const {
-    auto &params = ctx.params.top();
-    if (!params.ok()) {
-        return set::create();
-    }
-    if (auto local = params.extract(view); local.ok()) {
-        return local;
-    }
-    if (auto global = ctx.global.extract(view); global.ok()) {
-        return global;
-    }
-    if (auto solved = params.cast<set::Sets>().module->extract(view, ctx); solved.ok()) {
-        return solved;
-    }
+Module const *Set::digest(Context &ctx) {
     if (auto const *modFind = ctx.std.find(view)) {
-        return modFind->solve(ctx);
+        ref = modFind;
+    } else if (auto const *modFind = ctx.scope.top()->find(view)) {
+        ref = modFind;
     }
-    if (auto const *modFind = params.cast<set::Sets>().module->find(view)) {
-        return modFind->solve(ctx);
-    }
-    Quiet<style::yellow>(), "undefined extract '", view, "'\n";
-    printCode(ctx.file);
-    std::cout << std::flush;
-    return set::create();
+    return ref;
 }
 
-set::Set solveExpr(Module const &module, Set const &extract, Statements const &params, Context &ctx) {
-    auto p = params.solve(ctx);
-    p.cast<set::Sets>().module = &module;
-    ctx.params.push(std::move(p));
-    auto solve = extract.solve(ctx);
-    ctx.params.pop();
-    return solve;
+Module const *Fact::digest(Context &ctx) {
+    return _rvalue->digest(ctx);
 }
 
-set::Set Expression::solve(Context &ctx) const {
-    if (!_super) {
-        return _extract->solve(ctx);
+Module const *Module::digest(Context &ctx) {
+    ctx.scope.push(this);
+    for (auto const &fact : _stmts->get()) {
+        fact->digest(ctx);
     }
-    if (auto const *module = _super->solve(ctx).cast<set::Sets>().module) {
-        return ::solveExpr(*module, *_extract, *_params, ctx);
+    for (auto const &module : _modules) {
+        module.second->digest(ctx);
     }
-    Quiet<style::red>(), "undeclared module '", "'\n";
-    _params->printCode(ctx.file);
-    return set::create();
+    ctx.scope.pop();
+    return this;
 }
 
-set::Set Unary::solve(Context &ctx) const {
-    auto const *module = ctx.std.find(_op == Kind::Exclamation ? "Not" : "Neg");
-    return ::solveExpr(*module, Set("extract"), *_params, ctx);
+Module const *Expression::digest(Context &ctx) {
+    for (auto const &fact : _params->get()) {
+        fact->digest(ctx);
+    }
+    auto const *module = _super ? _super->digest(ctx) : _extract->digest(ctx);
+    if (!module) {
+        module = ctx.scope.top();
+    }
+    auto const *ref = module->find(getExtractName());
+    if (ref) {
+        _extract->ref = ref;
+    } else {
+        auto f = module->getFacts().facts;
+        auto find = f.equal_range(getExtractName());
+        for (auto it = find.first; it != find.second; ++it) {
+            _extract->facts.push_back(it->second);
+        }
+    }
+    return ref;
 }
 
-set::Set Binary::solve(Context &ctx) const {
+Module const *Unary::digest(Context &ctx) {
+    for (auto const &fact : _params->get()) {
+        fact->digest(ctx);
+    }
+    _ref = ctx.std.find(_op == Kind::Exclamation ? "Not" : "Neg");
+    return _ref;
+}
+
+Module const *Binary::digest(Context &ctx) {
+    for (auto const &fact : _params->get()) {
+        fact->digest(ctx);
+    }
     static std::map<Kind, std::string_view> const TABLE{
         {      Kind::SinglePlus,   "Add"},
         {     Kind::SingleMinus,   "Sub"},
@@ -257,8 +262,78 @@ set::Set Binary::solve(Context &ctx) const {
         {       Kind::DoubleAnd,   "And"},
         {        Kind::DoubleOr,    "Or"},
     };
-    auto const *module = ctx.std.find(TABLE.at(_op));
-    return ::solveExpr(*module, Set("extract"), *_params, ctx);
+    _ref = ctx.std.find(TABLE.at(_op));
+    return _ref;
+}
+
+set::Set Set::solve(Context &ctx) const {
+    auto &params = ctx.params.top();
+    if (!params.ok()) {
+        return set::create();
+    }
+    if (auto local = params.extract(view); local.ok()) {
+        return local;
+    }
+    if (auto global = ctx.global.extract(view); global.ok()) {
+        return global;
+    }
+    if (ref) {
+        return ref->solve(ctx);
+    }
+    auto solved = set::create();
+    Fact const *solvedFact;
+    for (auto const *f : facts) {
+        if (auto solving = f->solve(ctx); solving.ok()) {
+            if (solved.ok()) {
+                Quiet<style::red>(), "'", f->lvalue().view, "' ambiguous\n";
+                solvedFact->printCode(ctx.file);
+                f->printCode(ctx.file);
+                return set::create();
+            }
+            solved = std::move(solving);
+            solvedFact = f;
+        }
+    }
+    if (solved.ok()) {
+        return solved;
+    }
+
+    Quiet<style::yellow>(), "undefined extract '", view, "'\n";
+    printCode(ctx.file);
+    std::cout << std::flush;
+    return set::create();
+}
+
+set::Set solveExpr(Set const &extract, Statements const &params, Context &ctx) {
+    auto p = params.solve(ctx);
+    ctx.params.push(std::move(p));
+    auto solve = extract.solve(ctx);
+    ctx.params.pop();
+    return solve;
+}
+
+set::Set Expression::solve(Context &ctx) const {
+    if (!_super) {
+        return _extract->solve(ctx);
+    }
+    if (auto const *module = _super->getModule()) {
+        return ::solveExpr(*_extract, *_params, ctx);
+    }
+    Quiet<style::red>(), "undeclared module '", _extract->view, "'\n";
+    _params->printCode(ctx.file);
+    return set::create();
+}
+
+set::Set Unary::solve(Context &ctx) const {
+    auto ex = Set("extract");
+    ex.facts.push_back(_ref->getFacts().facts.begin()->second);
+    return ::solveExpr(ex, *_params, ctx);
+}
+
+set::Set Binary::solve(Context &ctx) const {
+    auto ex = Set("extract");
+    ex.facts.push_back(_ref->getFacts().facts.begin()->second);
+    return ::solveExpr(ex, *_params, ctx);
 }
 
 set::Set Fact::solve(Context &ctx) const {
@@ -291,14 +366,9 @@ set::Set Statements::solve(Context &ctx) const {
     return {std::move(sets)};
 }
 
-set::Set Module::solve(Context &ctx) const {
+set::Set Module::solve(Context & /*ctx*/) const {
     auto solve = set::create<set::Sets>();
-    for (auto const &m : _modules) {
-        solve.cast<set::Sets>().add(m.first, m.second->solve(ctx).move());
-    }
-    auto extract = solve.extract("");
-    extract.cast<set::Sets>().module = this;
-    return extract;
+    return solve;
 }
 
 Token::Token(Kind kind, std::string_view view) : Node(view), kind(kind) {}
@@ -334,7 +404,7 @@ Expression::Expression(
         _params = std::make_unique<Statements>();
     }
     if (super) {
-        _super = std::move(super);
+        _super.reset(&super.release()->cast<Expression>());
         view = combine(*_super).view;
     } else {
         _super = nullptr;
@@ -346,12 +416,16 @@ void Expression::setExtract(std::unique_ptr<Token> &&extract) {
 }
 
 void Expression::setSuperset(std::unique_ptr<Token> &&super) {
-    _super = std::move(super);
+    _super.reset(&super.release()->cast<Expression>());
     view = combine(*super).view;
 }
 
 std::string_view Expression::getExtractName() const {
     return _extract->view;
+}
+
+Module const *Expression::getModule() const {
+    return _extract->ref;
 }
 
 void Unary::setParam(std::unique_ptr<Token> &&param) {
@@ -463,26 +537,6 @@ Module const *Module::find(std::string_view name) const {
     return nullptr;
 }
 
-set::Set Module::extract(std::string_view name, Context &ctx) const {
-    auto facts = getFacts();
-    auto factFind = facts.facts.equal_range(name);
-    auto solved = set::create();
-    Fact *solvedFact;
-    for (auto it = factFind.first; it != factFind.second; ++it) {
-        if (auto solving = it->second->solve(ctx); solving.ok()) {
-            if (solved.ok()) {
-                Quiet<style::red>(), "'", name, "' ambiguous\n";
-                solvedFact->printCode(ctx.file);
-                it->second->printCode(ctx.file);
-                return set::create();
-            }
-            solved = std::move(solving);
-            solvedFact = it->second;
-        }
-    }
-    return solved;
-}
-
 void Token::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "token\n";
 }
@@ -496,9 +550,11 @@ void Set::dump(size_t indent) const {
 }
 
 void Expression::dump(size_t indent) const {
-    std::cout << std::string(indent * 2, ' ') << "extract from " << _super << "\n";
+    std::cout << std::string(indent * 2, ' ') << "extract " << _extract->view << ": "
+              << (_super ? _super->getExtractName() : "?") << "\n";
     if (_extract) _extract->dump(indent + 1);
     if (_params) _params->dump(indent + 1);
+    if (_super) _super->dump(indent + 1);
 }
 
 void Unary::dump(size_t indent) const {

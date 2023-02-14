@@ -217,15 +217,19 @@ void run(char const *filename) {
 
     Context ctx(str);
     auto ast = genAst(parser.getCst()._Get_container().front()->cast<node::Nonterm>(), ctx);
-    // ast->dump();
-    // std::cout << std::flush;
 
     auto modulename = filename2module(filename);
     auto root = node::Module(std::move(ast), {str}, modulename);
-    auto args = set::create<set::Sets>();
-    args.cast<set::Sets>().module = &root;
-    ctx.params.push(std::move(args));
-    auto expr = node::Expression(std::make_unique<node::Set>("main"), std::make_unique<node::Set>(modulename), nullptr);
+    ctx.scope.push(&root);
+    auto super = std::make_unique<node::Expression>(std::make_unique<node::Set>(modulename), nullptr, nullptr);
+    auto expr = node::Expression(std::make_unique<node::Set>("main"), nullptr, std::move(super));
+
+    expr.digest(ctx);
+    root.digest(ctx);
+
+    root.dump();
+    std::cout << std::flush;
+
     auto solved = expr.solve(ctx);
 
     // compile to llvm ir here

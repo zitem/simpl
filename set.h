@@ -1,9 +1,5 @@
 #pragma once
 
-namespace node {
-class Module;
-}
-
 namespace set {
 
 struct Interface;
@@ -45,6 +41,8 @@ struct Interface {
 
     virtual $ clone() const = 0;
     virtual std::string show() const = 0;
+
+    virtual $ resolve(Interface const &set) const { return nullptr; }
 
     template <typename T> requires derived<T> T &cast() { return *static_cast<T *>(this); }
     template <typename T> requires derived<T> T const &cast() const { return *static_cast<T const *>(this); }
@@ -109,6 +107,7 @@ struct Identity : Interface {
     $ contains(Interface const &set) const override { return thisset() == set.superset(); }
     bool ok() const override { return true; }
     $ extract(std::string_view name) const override;
+    $ resolve(const Interface &set) const override;
 
     $ clone() const override;
 
@@ -331,6 +330,8 @@ public:
 
     std::string show() const override { return std::format("{}", _val); }
 
+    $ resolve(const Interface &set) const override;
+
     T value() const { return _val; }
 
 private:
@@ -456,11 +457,66 @@ public:
     }
     std::string show() const override { return "sets"; }
 
-    node::Module const *module{};
-
 private:
     std::map<std::string_view, $> _data;
 };
+
+template <auto Impl> class Module : public Interface {
+public:
+    Interface const &thisset() const override { return *this; }
+    Interface const &superset() const override { return Universe::id; }
+
+    $ operator+(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator-(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator*(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator/(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator!() const override { return std::make_unique<Failure>(); }
+    $ operator-() const override { return std::make_unique<Failure>(); }
+
+    $ operator<(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator>(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator<=(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator>=(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator||(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator&&(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+
+    $ operator==(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ operator!=(Interface const & /*set*/) const override { return std::make_unique<Failure>(); }
+    $ contains(const Interface & /*set*/) const override { return std::make_unique<Failure>(); }
+    bool ok() const override { return true; }
+    $ extract(std::string_view /*name*/) const override { return std::make_unique<Failure>(); }
+
+    $ clone() const override { return std::make_unique<Failure>(); }
+    std::string show() const override { return "module"; }
+
+    $ resolve(const Interface &set) const override {
+        auto x = set.extract("x");
+        auto y = set.extract("y");
+        if (x->superset().resolve(Void::id)->operator!=(Int::super)->cast<Bool>().value()) {
+            return std::make_unique<Failure>();
+        }
+        if (y->superset().resolve(Void::id)->operator!=(Int::super)->cast<Bool>().value()) {
+            return std::make_unique<Failure>();
+        }
+        auto xx = x->resolve(Void::id);
+        auto yy = y->resolve(Void::id);
+        return *xx + *yy;
+    }
+};
+
+using Add = Module<[](auto x, auto y) { return x + y; }>;
+using Sub = Module<[](auto x, auto y) { return x - y; }>;
+using Mul = Module<[](auto x, auto y) { return x * y; }>;
+using Div = Module<[](auto x, auto y) { return x / y; }>;
+
+inline void exec() {
+    auto add = Add();
+    auto params = Sets();
+    params.add("x", std::make_unique<Int>(3));
+    params.add("y", std::make_unique<Int>(2));
+    auto res = add.resolve(params);
+    std::cout << res->show();
+}
 
 class Array : public Interface {
 public:
@@ -509,7 +565,9 @@ private:
     std::vector<$> _data;
 };
 
-// impl
+// // // // // //
+//  implement  //
+// // // // // //
 
 template <typename S, typename... Args> static Set create(Args &&...args) {
     return Set{std::make_unique<S>(std::forward<Args>(args)...)};
@@ -597,6 +655,10 @@ inline $ Identity::clone() const {
     return std::make_unique<Ref>(*this);
 }
 
+inline $ Identity::resolve(const Interface & /*set*/) const {
+    return std::make_unique<Ref>(*this);
+}
+
 // Void
 inline Interface const &Void::superset() const {
     return Every::id;
@@ -609,6 +671,11 @@ inline $ Void::operator!() const {
 // Universe
 inline $ Universe::contains(Interface const & /*set*/) const {
     return std::make_unique<Bool>(true);
+}
+
+// base
+template <typename T> $ Base<T>::resolve(const Interface & /*set*/) const {
+    return std::make_unique<Ref>(*this);
 }
 
 // Sets

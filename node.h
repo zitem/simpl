@@ -159,8 +159,9 @@ struct Token : Node {
     Token(Kind kind, Node const &node);
     Token(Kind kind, std::string_view view);
     virtual ~Token() = default;
-    virtual Module const *digest(Context &ctx) { return (void)ctx, nullptr; } // Semantic Analyzer (instantiate)
+    virtual Module const *digest(Context &ctx) { return (void)ctx, nullptr; }
     virtual set::Set solve(Context &ctx) const { return (void)ctx, set::create(); }
+    set::Set solveWithParams(set::Set params, Context &ctx) const;
     virtual void dump(size_t indent = 0) const;
     template <typename T> T &cast() { return *static_cast<T *>(this); }
     template <typename T> T const &cast() const { return *static_cast<T const *>(this); }
@@ -174,20 +175,6 @@ struct Nonterm : Token {
     std::vector<std::unique_ptr<Token>> args;
     void dump(size_t indent = 0) const override;
     int size{};
-};
-
-struct Set : Token {
-    Set(std::string_view view, std::unique_ptr<Token> &&annotation = {});
-    void setSuperset(std::unique_ptr<Token> &&set);
-    Token *getSuperset();
-    std::string value() const { return std::string(view); }
-    Module const *digest(Context &ctx) override;
-    set::Set solve(Context &ctx) const override;
-    void dump(size_t indent = 0) const override;
-    Module const *ref{};
-    std::vector<Fact const *> facts;
-private:
-    std::unique_ptr<Token> _annotation;
 };
 
 template <typename Derived> struct BaseSet : Token {
@@ -235,6 +222,7 @@ public:
     void setName(std::string_view const &name);
     std::string const &getName() const;
     Facts getFacts() const;
+    set::Set genSet(set::Set const &param, Context &ctx) const;
     Module const *find(std::string_view name) const;
 private:
     std::unique_ptr<Statements> _stmts;
@@ -245,6 +233,7 @@ private:
 class Statements : public Token {
 public:
     template <typename... T> Statements(T &&...init) : Token(Kind::Stmt, {}) { (..., pushBack(std::move(init))); }
+    Module const *digest(Context &ctx) override;
     void pushFront(std::unique_ptr<Token> &&stmt);
     void pushBack(std::unique_ptr<Token> &&stmt);
     void dump(size_t indent = 0) const override;
@@ -255,9 +244,25 @@ private:
     friend Module::Module(std::unique_ptr<Token> &&, Node const &, std::string);
 };
 
+struct Set : Token {
+    Set(std::string_view view, std::unique_ptr<Token> &&annotation = {}, std::unique_ptr<Token> &&params = {});
+    void setSuperset(std::unique_ptr<Token> &&set);
+    Token *getSuperset();
+    void setParams(std::unique_ptr<Token> &&params);
+    std::string value() const { return std::string(view); }
+    Module const *digest(Context &ctx) override;
+    set::Set solve(Context &ctx) const override;
+    void dump(size_t indent = 0) const override;
+    Module const *ref{};
+    std::vector<Fact const *> facts;
+private:
+    std::unique_ptr<Token> _annotation;
+    std::unique_ptr<Statements> _params;
+};
+
 class Expression : public Token {
 public:
-    Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&params, std::unique_ptr<Token> &&super);
+    Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&super);
     Module const *digest(Context &ctx) override;
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
@@ -267,7 +272,6 @@ public:
     Module const *getModule() const;
 private:
     std::unique_ptr<Set> _extract;
-    std::unique_ptr<Statements> _params;
     std::unique_ptr<Expression> _super;
 };
 
@@ -278,9 +282,10 @@ public:
     set::Set solve(Context &ctx) const override;
     void dump(size_t indent = 0) const override;
     void setParam(std::unique_ptr<Token> &&param);
+    Module const *ref{};
 private:
+    static std::map<Kind, std::string_view> const table;
     std::unique_ptr<Statements> _params;
-    Module const* _ref{};
     Kind _op;
 };
 
@@ -293,10 +298,11 @@ public:
     void competedLhs(std::unique_ptr<Token> &&param);
     void setLhs(std::unique_ptr<Token> &&param);
     void setRhs(std::unique_ptr<Token> &&param);
+    Module const *ref{};
 private:
+    static std::map<Kind, std::string_view> const table;
     std::unique_ptr<Statements> _params = std::make_unique<Statements>();
     Binary *_binaryLhs{};
-    Module const* _ref{};
     Kind _op;
 };
 
@@ -317,7 +323,6 @@ private:
 
 struct Context {
     Context(std::string const &file);
-    node::Module std;
     set::Set global;
     std::stack<set::Set> params;
     std::stack<node::Module const *> scope;

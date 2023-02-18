@@ -1,5 +1,4 @@
 #include "node.h"
-#include "builtinModules.h"
 #include "outs.h"
 
 using namespace node;
@@ -127,11 +126,7 @@ std::array<Kind::Info, Kind::Value::Size> const Kind::infos{
     {"GEpsilon",           "GEpsilon"},
 };
 
-Context::Context(std::string const &file) : std(builtinModules::all()), file(file), global(set::create<set::Sets>()) {
-    auto &sets = global.cast<set::Sets>();
-    sets.add("bool", set::create<set::Ref>(set::Bool::super).move());
-    sets.add("int", set::create<set::Ref>(set::Int::super).move());
-}
+Context::Context(std::string const &file) : file(file), global(set::std()) {}
 
 std::pair<Node::Pos, Node::Pos> Node::getRange(std::string const &str) const {
     if (view._Unchecked_begin() < str._Unchecked_begin() || view._Unchecked_end() > str._Unchecked_end()) return {};
@@ -190,23 +185,22 @@ void Node::printCode(std::string const &file) const {
 }
 
 Module const *Set::digest(Context &ctx) {
-    if (auto const *modFind = ctx.std.find(view)) {
-        ref = modFind;
-    } else if (auto const *modFind = ctx.scope.top()->find(view)) {
+    if (_params) {
+        _params->digest(ctx);
+    }
+    if (auto const *modFind = ctx.scope.top()->find(view)) {
         ref = modFind;
     }
     return ref;
 }
 
 Module const *Fact::digest(Context &ctx) {
-    return _rvalue->digest(ctx);
+    return _rvalue ? _rvalue->digest(ctx) : nullptr;
 }
 
 Module const *Module::digest(Context &ctx) {
     ctx.scope.push(this);
-    for (auto const &fact : _stmts->get()) {
-        fact->digest(ctx);
-    }
+    _stmts->digest(ctx);
     for (auto const &module : _modules) {
         module.second->digest(ctx);
     }
@@ -214,10 +208,14 @@ Module const *Module::digest(Context &ctx) {
     return this;
 }
 
-Module const *Expression::digest(Context &ctx) {
-    for (auto const &fact : _params->get()) {
+Module const *Statements::digest(Context &ctx) {
+    for (auto const &fact : get()) {
         fact->digest(ctx);
     }
+    return nullptr;
+}
+
+Module const *Expression::digest(Context &ctx) {
     auto const *module = _super ? _super->digest(ctx) : _extract->digest(ctx);
     if (!module) {
         module = ctx.scope.top();
@@ -235,50 +233,56 @@ Module const *Expression::digest(Context &ctx) {
     return ref;
 }
 
+std::map<Kind, std::string_view> const Unary::table{
+    {Kind::Exclamation, "Not"},
+    {Kind::SingleMinus, "Neg"},
+};
+
 Module const *Unary::digest(Context &ctx) {
-    for (auto const &fact : _params->get()) {
-        fact->digest(ctx);
+    _params->digest(ctx);
+    if (auto const *find = ctx.scope.top()->find(table.at(_op))) {
+        ref = find;
     }
-    _ref = ctx.std.find(_op == Kind::Exclamation ? "Not" : "Neg");
-    return _ref;
+    return ref;
 }
 
+std::map<Kind, std::string_view> const Binary::table{
+    {      Kind::SinglePlus,   "Add"},
+    {     Kind::SingleMinus,   "Sub"},
+    {  Kind::SingleAsterisk,   "Mul"},
+    {     Kind::SingleSlash,   "Div"},
+    {        Kind::LessThan,    "Lt"},
+    {       Kind::GreatThan,    "Gt"},
+    { Kind::LessThanOrEqual,  "Lteq"},
+    {Kind::GreatThanOrEqual,  "Gteq"},
+    {     Kind::DoubleEqual,    "Eq"},
+    {Kind::ExclamationEqual, "Noteq"},
+    {     Kind::Exclamation,   "Not"},
+    {       Kind::DoubleAnd,   "And"},
+    {        Kind::DoubleOr,    "Or"},
+};
+
 Module const *Binary::digest(Context &ctx) {
-    for (auto const &fact : _params->get()) {
-        fact->digest(ctx);
+    _params->digest(ctx);
+    if (auto const *find = ctx.scope.top()->find(table.at(_op))) {
+        ref = find;
     }
-    static std::map<Kind, std::string_view> const TABLE{
-        {      Kind::SinglePlus,   "Add"},
-        {     Kind::SingleMinus,   "Sub"},
-        {  Kind::SingleAsterisk,   "Mul"},
-        {     Kind::SingleSlash,   "Div"},
-        {        Kind::LessThan,    "Lt"},
-        {       Kind::GreatThan,    "Gt"},
-        { Kind::LessThanOrEqual,  "Lteq"},
-        {Kind::GreatThanOrEqual,  "Gteq"},
-        {     Kind::DoubleEqual,    "Eq"},
-        {Kind::ExclamationEqual, "Noteq"},
-        {     Kind::Exclamation,   "Not"},
-        {       Kind::DoubleAnd,   "And"},
-        {        Kind::DoubleOr,    "Or"},
-    };
-    _ref = ctx.std.find(TABLE.at(_op));
-    return _ref;
+    return ref;
 }
 
 set::Set Set::solve(Context &ctx) const {
-    auto &params = ctx.params.top();
-    if (!params.ok()) {
-        return set::create();
-    }
-    if (auto local = params.extract(view); local.ok()) {
-        return local;
-    }
-    if (auto global = ctx.global.extract(view); global.ok()) {
-        return global;
-    }
+    auto params = _params ? _params->solve(ctx) : set::create<set::Sets>();
     if (ref) {
-        return ref->solve(ctx);
+        auto set = ref->solveWithParams(std::move(params), ctx);
+        return set;
+    }
+    if (auto local = ctx.params.top().extract(view); local.ok()) { // module a { b = c + 1 }
+        auto resolve = local.resolve(params);                      //                ^
+        return resolve;
+    }
+    if (auto global = ctx.global.extract(view); global.ok()) { // main = int
+        auto resolve = global.resolve(params);                 //        ^^^
+        return resolve;
     }
     auto solved = set::create();
     Fact const *solvedFact;
@@ -304,36 +308,41 @@ set::Set Set::solve(Context &ctx) const {
     return set::create();
 }
 
-set::Set solveExpr(Set const &extract, Statements const &params, Context &ctx) {
-    auto p = params.solve(ctx);
-    ctx.params.push(std::move(p));
-    auto solve = extract.solve(ctx);
-    ctx.params.pop();
-    return solve;
-}
-
 set::Set Expression::solve(Context &ctx) const {
-    if (!_super) {
-        return _extract->solve(ctx);
+    if (_super) {
+        auto super = _super->solve(ctx);
+        if (!super.ok()) return set::create();
+        if (auto ex = super.extract(_extract->view); ex.ok()) {
+            return ex;
+        }
     }
-    if (auto const *module = _super->getModule()) {
-        return ::solveExpr(*_extract, *_params, ctx);
+    if (auto solve = _extract->solve(ctx); solve.ok()) {
+        return solve;
     }
-    Quiet<style::red>(), "undeclared module '", _extract->view, "'\n";
-    _params->printCode(ctx.file);
+    Quiet<style::yellow>(), "undeclared set '", _extract->view, "'\n";
+    _extract->printCode(ctx.file);
     return set::create();
 }
 
 set::Set Unary::solve(Context &ctx) const {
-    auto ex = Set("extract");
-    ex.facts.push_back(_ref->getFacts().facts.begin()->second);
-    return ::solveExpr(ex, *_params, ctx);
+    if (auto ex = ctx.global.extract(table.at(_op)); ex.ok()) {
+        return ex.resolve(_params->solve(ctx)).extract("extract");
+    }
+    return set::create();
 }
 
 set::Set Binary::solve(Context &ctx) const {
-    auto ex = Set("extract");
-    ex.facts.push_back(_ref->getFacts().facts.begin()->second);
-    return ::solveExpr(ex, *_params, ctx);
+    auto const params = _params->solve(ctx);
+
+    if (ref) {
+        if (auto local = ref->solveWithParams(params.clone(), ctx); local.ok()) {
+            return local.extract("extract");
+        }
+    }
+    if (auto ex = ctx.global.extract(table.at(_op)); ex.ok()) {
+        return ex.resolve(params).extract("extract");
+    }
+    return set::create();
 }
 
 set::Set Fact::solve(Context &ctx) const {
@@ -366,14 +375,36 @@ set::Set Statements::solve(Context &ctx) const {
     return {std::move(sets)};
 }
 
-set::Set Module::solve(Context & /*ctx*/) const {
-    auto solve = set::create<set::Sets>();
-    return solve;
+set::Set Module::solve(Context &ctx) const {
+    auto res = set::create<set::Sets>();
+    auto &set = res.cast<set::Sets>();
+    for (auto const &stmt : _stmts->get()) {
+        auto const &fact = stmt->cast<Fact>();
+        auto name = fact.lvalue().view;
+        if (auto ex = ctx.params.top().extract(name); ex.ok()) {
+            set.add(name, ex.move());
+        } else {
+            auto solve = fact.solve(ctx);
+            bool ambiguous = !set.add(name, solve.move());
+            if (ambiguous) {
+                Quiet<style::red>(), "'", name, "' ambiguous\n";
+                fact.printCode(ctx.file);
+            }
+        }
+    }
+    return res;
 }
 
 Token::Token(Kind kind, std::string_view view) : Node(view), kind(kind) {}
 
 Token::Token(Kind kind, Node const &node) : Node(node), kind(kind) {}
+
+set::Set Token::solveWithParams(set::Set params, Context &ctx) const {
+    ctx.params.push(std::move(params));
+    auto slv = solve(ctx);
+    ctx.params.pop();
+    return slv;
+}
 
 Nonterm::Nonterm(Kind kind) : Token(kind, {}) {}
 
@@ -382,8 +413,8 @@ void Nonterm::pushArgs(std::vector<std::unique_ptr<Token>> tokens) {
     args = std::move(tokens);
 };
 
-Set::Set(std::string_view view, std::unique_ptr<Token> &&annotation)
-    : Token(Kind::Set, view), _annotation(std::move(annotation)) {}
+Set::Set(std::string_view view, std::unique_ptr<Token> &&annotation, std::unique_ptr<Token> &&params)
+    : Token(Kind::Set, view), _annotation(std::move(annotation)), _params(&params.release()->cast<Statements>()) {}
 
 void Set::setSuperset(std::unique_ptr<Token> &&set) {
     _annotation = std::move(set);
@@ -393,16 +424,12 @@ Token *Set::getSuperset() {
     return _annotation.get();
 }
 
-Expression::Expression(
-    std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&params, std::unique_ptr<Token> &&super
-)
+void Set::setParams(std::unique_ptr<Token> &&params) {
+    _params.reset(&params.release()->cast<Statements>());
+}
+
+Expression::Expression(std::unique_ptr<Token> &&extract, std::unique_ptr<Token> &&super)
     : Token(Kind::Expr, extract->view), _extract(&extract.release()->cast<Set>()) {
-    if (params) {
-        _params.reset(&params.release()->cast<Statements>());
-        view = combine(*_params).view;
-    } else {
-        _params = std::make_unique<Statements>();
-    }
     if (super) {
         _super.reset(&super.release()->cast<Expression>());
         view = combine(*_super).view;
@@ -547,13 +574,13 @@ void Nonterm::dump(size_t indent) const {
 
 void Set::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << view << "\n";
+    if (_params) _params->dump(indent + 1);
 }
 
 void Expression::dump(size_t indent) const {
     std::cout << std::string(indent * 2, ' ') << "extract " << _extract->view << ": "
               << (_super ? _super->getExtractName() : "?") << "\n";
     if (_extract) _extract->dump(indent + 1);
-    if (_params) _params->dump(indent + 1);
     if (_super) _super->dump(indent + 1);
 }
 

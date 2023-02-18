@@ -7,8 +7,6 @@ set(CMAKE_CXX_STANDARD 23)
 project(${project} CXX)
 
 add_executable(${target_compiler} 
-    builtinModules.cpp
-    builtinModules.h
     cfg.cpp
     cfg.h
     lexer.cpp
@@ -21,6 +19,7 @@ add_executable(${target_compiler}
     parser.cpp
     parser.h
     set.h
+    set.cpp
     utils.h
 )
 

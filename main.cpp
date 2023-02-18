@@ -60,7 +60,8 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
             auto id = genAst(nonterm(0), ctx);
             auto params = genAst(nonterm(1), ctx);
             auto super = genAst(nonterm(2), ctx);
-            return std::make_unique<node::Expression>(std::move(id), std::move(params), std::move(super));
+            id->cast<node::Set>().setParams(std::move(params));
+            return std::make_unique<node::Expression>(std::move(id), std::move(super));
         }
         case Kind::OpenParenthesis: return genAst(nonterm(1), ctx);
         case Kind::OpenCurlyBracket: return std::make_unique<node::Void>(nonterm(0).combine(*get(1)));
@@ -115,7 +116,8 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
             auto extract = genAst(nonterm(1), ctx);
             auto params = genAst(nonterm(2), ctx);
             auto super = genAst(nonterm(3), ctx);
-            return std::make_unique<node::Expression>(std::move(extract), std::move(params), std::move(super));
+            extract->cast<node::Set>().setParams(std::move(params));
+            return std::make_unique<node::Expression>(std::move(extract), std::move(super));
         }
         }
 
@@ -221,14 +223,15 @@ void run(char const *filename) {
     auto modulename = filename2module(filename);
     auto root = node::Module(std::move(ast), {str}, modulename);
     ctx.scope.push(&root);
-    auto super = std::make_unique<node::Expression>(std::make_unique<node::Set>(modulename), nullptr, nullptr);
-    auto expr = node::Expression(std::make_unique<node::Set>("main"), nullptr, std::move(super));
+    ctx.params.push(set::create<set::Sets>());
+    auto super = std::make_unique<node::Expression>(std::make_unique<node::Set>(modulename), nullptr);
+    auto expr = node::Expression(std::make_unique<node::Set>("main"), std::move(super));
 
     expr.digest(ctx);
     root.digest(ctx);
 
-    root.dump();
-    std::cout << std::flush;
+    // root.dump();
+    // std::cout << std::flush;
 
     auto solved = expr.solve(ctx);
 

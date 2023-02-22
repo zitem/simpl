@@ -195,6 +195,9 @@ Module const *Set::digest(Context &ctx) {
 }
 
 Module const *Fact::digest(Context &ctx) {
+    if (auto *super = _lvalue->getSuperset()) {
+        super->digest(ctx);
+    }
     return _rvalue ? _rvalue->digest(ctx) : nullptr;
 }
 
@@ -240,8 +243,9 @@ std::map<Kind, std::string_view> const Unary::table{
 
 Module const *Unary::digest(Context &ctx) {
     _params->digest(ctx);
-    if (auto const *find = ctx.scope.top()->find(table.at(_op))) {
-        ref = find;
+    auto id = table.at(_op);
+    if (auto const *module = ctx.scope.top()->find(id)) {
+        ref = module;
     }
     return ref;
 }
@@ -272,6 +276,9 @@ Module const *Binary::digest(Context &ctx) {
 
 set::Set Set::solve(Context &ctx) const {
     auto params = _params ? _params->solve(ctx) : set::create<set::Sets>();
+    if (!params.ok()) {
+        return set::create();
+    }
     if (ref) {
         auto set = ref->solveWithParams(std::move(params), ctx);
         return set;
@@ -311,7 +318,9 @@ set::Set Set::solve(Context &ctx) const {
 set::Set Expression::solve(Context &ctx) const {
     if (_super) {
         auto super = _super->solve(ctx);
-        if (!super.ok()) return set::create();
+        if (!super.ok()) {
+            return set::create();
+        }
         if (auto ex = super.extract(_extract->view); ex.ok()) {
             return ex;
         }
@@ -325,15 +334,21 @@ set::Set Expression::solve(Context &ctx) const {
 }
 
 set::Set Unary::solve(Context &ctx) const {
+    auto const params = _params->solve(ctx);
+    if (!params.ok()) {
+        return set::create();
+    }
     if (auto ex = ctx.global.extract(table.at(_op)); ex.ok()) {
-        return ex.resolve(_params->solve(ctx)).extract("extract");
+        return ex.resolve(std::move(params)).extract("extract");
     }
     return set::create();
 }
 
 set::Set Binary::solve(Context &ctx) const {
     auto const params = _params->solve(ctx);
-
+    if (!params.ok()) {
+        return set::create();
+    }
     if (ref) {
         if (auto local = ref->solveWithParams(params.clone(), ctx); local.ok()) {
             return local.extract("extract");
@@ -370,7 +385,15 @@ set::Set Statements::solve(Context &ctx) const {
         auto &fact = s->cast<Fact>();
         auto name = fact.lvalue().view;
         auto solve = s->solve(ctx);
-        sets->add(name, solve.move());
+        if (!solve.ok()) {
+            return set::create();
+        }
+        bool ambiguous = !sets->add(name, solve.move());
+        if (ambiguous) {
+            Quiet<style::red>(), "'", name, "' ambiguous\n";
+            fact.printCode(ctx.file);
+            return set::create();
+        }
     }
     return {std::move(sets)};
 }
@@ -389,6 +412,7 @@ set::Set Module::solve(Context &ctx) const {
             if (ambiguous) {
                 Quiet<style::red>(), "'", name, "' ambiguous\n";
                 fact.printCode(ctx.file);
+                return set::create();
             }
         }
     }

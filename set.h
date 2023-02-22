@@ -306,7 +306,7 @@ private:
     std::map<std::string_view, $> _data;
 };
 
-template <typename Set, auto Impl> class Unary : public Interface {
+template <typename T, auto Impl> class Unary : public Interface {
 public:
     Interface const &thisset() const override { return *this; }
     Interface const &superset() const override { return Universe::id; }
@@ -322,21 +322,21 @@ public:
 
     $ resolve(const Interface &set) const override {
         auto v = set.extract("v");
-        if (v->superset().resolve(Void::id)->operator!=(Set::super)->template cast<Bool>().value()) {
+        if (v->superset().resolve(Void::id)->operator!=(T::super)->template cast<Bool>().value()) {
             return std::make_unique<Failure>();
         }
         auto val = v->resolve(Void::id);
         if (!val->ok()) {
-            return std::make_unique<Unsolved>(Set::super);
+            return std::make_unique<Unsolved>(T::super);
         }
-        auto extract = Impl(val->thisset().cast<Set>());
+        auto extract = Impl(val->thisset().cast<T>());
         auto sets = std::make_unique<Sets>();
         sets->add("extract", std::move(extract));
         return sets;
     }
 };
 
-template <typename Set, auto Impl> class Binary : public Interface {
+template <typename T, auto Impl> class Binary : public Interface {
 public:
     Interface const &thisset() const override { return *this; }
     Interface const &superset() const override { return Universe::id; }
@@ -356,7 +356,7 @@ public:
         auto superOk = []($ const &s) {
             auto const &super = s->superset();
             auto resolve = super.resolve(Void::id);
-            auto eq = resolve->operator==(Set::super);
+            auto eq = resolve->operator==(T::super);
             auto cast = eq->template cast<Bool>();
             return cast.value();
         };
@@ -366,11 +366,14 @@ public:
         auto xx = x->resolve(Void::id);
         auto yy = y->resolve(Void::id);
         if (!xx->ok() || !yy->ok()) {
-            return std::make_unique<Unsolved>(Set::super);
+            return std::make_unique<Unsolved>(T::super);
         }
-        auto extract = Impl(xx->thisset().cast<Set>(), yy->thisset().cast<Set>());
+        auto extract = Impl(xx->thisset().cast<T>(), yy->thisset().cast<T>());
         auto sets = std::make_unique<Sets>();
         sets->add("extract", std::move(extract));
+        /*debug*/ auto rhs = xx->show();
+        /*debug*/ auto lhs = yy->show();
+        /*debug*/ auto value = sets->extract("extract")->show();
         return sets;
     }
 };
@@ -410,6 +413,14 @@ private:
 
 using Not = Unary<Bool, [](auto v) { return !v; }>;
 using Neg = Unary<Int, [](auto v) { return -v; }>;
+using If = Unary<Bool, [](auto v) {
+    $ s;
+    if (v.value())
+        s = std::make_unique<Universe>();
+    else
+        s = std::make_unique<Void>();
+    return s;
+}>;
 using Add = Binary<Int, [](auto x, auto y) { return x + y; }>;
 using Sub = Binary<Int, [](auto x, auto y) { return x - y; }>;
 using Mul = Binary<Int, [](auto x, auto y) { return x * y; }>;
@@ -531,6 +542,7 @@ inline Set std() {
     sets->add("Eq_Bool", std::make_unique<Eq<Bool>>());
     sets->add("Noteq_Int", std::make_unique<Noteq<Int>>());
     sets->add("Noteq_Bool", std::make_unique<Noteq<Bool>>());
+    sets->add("If", std::make_unique<If>());
     return {std::move(sets)};
 }
 

@@ -69,7 +69,7 @@ struct CharRegion : Base {
     CharRegion(char left, char right, Kind kind) : Base(kind), left(left), right(right) {}
      std::string show() const override { return std::format("{}...{}", left, right); }
     bool match(std::string_view const &view) override { return view.size() > 1 || view.front() == left; }
-    bool over(std::string_view const &view) override { return view.size() > 2 && *(view.rbegin() - 1) == right; }
+    bool over(std::string_view const &view) override { return view.size() > 2 && *(view.rbegin() + 1) == right; }
     char const left;
     char const right;
 };

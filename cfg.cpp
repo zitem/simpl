@@ -27,7 +27,7 @@ int genCFG(Nonterm &self, std::map<Kind, std::vector<std::vector<Kind>>> &ctx, K
         break;
     case Kind::GTup_:
         if (self.size == 1) break;
-        ctx.at(lhs).push_back({});
+        ctx.at(lhs).emplace_back();
         genCFG(nonterm(1), ctx, lhs);
         genCFG(nonterm(2), ctx, lhs);
         break;
@@ -78,7 +78,7 @@ std::vector<std::shared_ptr<Base>> const bnfSymbols{
     std::make_shared<StrFixed>("<=>", Kind::Spaceship),
     std::make_shared<StrFixed>("module", Kind::Module),
     std::make_shared<StrFixed>("Root", Kind::Root),
-    std::make_shared<StrFixed>("epsilon", Kind::Epsilon),
+    std::make_shared<StrFixed>("epsilon", Kind::epsilon),
     std::make_shared<StrFixed>("Stmt", Kind::Stmt),
     std::make_shared<StrFixed>("Stmt'", Kind::Stm_),
     std::make_shared<StrFixed>("Expr", Kind::Expr),
@@ -173,7 +173,7 @@ Parser::CFG const cfgcfg{
          {Kind::Spaceship},
          {Kind::Module},
          {Kind::Root},
-         {Kind::Epsilon},
+         {Kind::epsilon},
          {Kind::Stmt},
          {Kind::Stm_},
          {Kind::Expr},
@@ -231,11 +231,11 @@ void LangCFG::test() {
                                   "Expr' ::= epsilon <+> + Id Expr' <$>\n";
 
     static Parser::CFG sampleAnswer{
-        {Kind::Root,                                                             {{Kind::Epsilon}, {Kind::Stmt}}},
+        {Kind::Root,                                                             {{Kind::epsilon}, {Kind::Stmt}}},
         {Kind::Stmt,                                                 {{Kind::Expr, Kind::Semicolon, Kind::Stm_}}},
-        {Kind::Stm_, {{Kind::Epsilon}, {Kind::Expr, Kind::Semicolon, Kind::Stm_}, {Kind::Semicolon, Kind::Stm_}}},
+        {Kind::Stm_, {{Kind::epsilon}, {Kind::Expr, Kind::Semicolon, Kind::Stm_}, {Kind::Semicolon, Kind::Stm_}}},
         {Kind::Expr,                                                                    {{Kind::Id, Kind::Exp_}}},
-        {Kind::Exp_,                                 {{Kind::Epsilon}, {Kind::SinglePlus, Kind::Id, Kind::Exp_}}},
+        {Kind::Exp_,                                 {{Kind::epsilon}, {Kind::SinglePlus, Kind::Id, Kind::Exp_}}},
     };
 
     Parser parser;

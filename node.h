@@ -54,7 +54,7 @@ struct Kind {
         Set,
         Extract,
 
-        Epsilon,
+        epsilon,
         Eof,
 
         Invalid,

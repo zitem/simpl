@@ -408,6 +408,7 @@ set::Set Module::solve(Context &ctx) const {
             set.add(name, ex.move());
         } else {
             auto solve = fact.solve(ctx);
+            auto debug = solve.clone();
             bool ambiguous = !set.add(name, solve.move());
             if (ambiguous) {
                 Quiet<style::red>(), "'", name, "' ambiguous\n";

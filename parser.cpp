@@ -9,8 +9,8 @@ void Parser::setupGramma(CFG cfg, Kind root, Kind epsilon) {
     _cfg = std::move(cfg);
     _root = root;
     _epsilon = epsilon;
-    _stack.push({Kind::Eof});
-    _stack.push({_root});
+    _stack.emplace(Kind::Eof);
+    _stack.emplace(_root);
 
     for (auto const &g : _cfg) {
         _nonterms[g.first.value()] = true;
@@ -44,7 +44,7 @@ std::stack<std::unique_ptr<Token>> const &Parser::getCst() const {
 
 void Parser::reset() {
     _root = Kind::Root;
-    _epsilon = Kind::Epsilon;
+    _epsilon = Kind::epsilon;
     _nonterms = {};
     _cst = {};
     _stack = {};
@@ -90,9 +90,9 @@ int Parser::parse(Token const &input) {
                     auto token = std::make_unique<Nonterm>(grammaKind);
                     token->size = (int)gramma[rule].size();
                     top.push(std::move(token));
-                    _stack.push({*it, std::move(top)});
+                    _stack.emplace(*it, std::move(top));
                 } else {
-                    _stack.push({*it});
+                    _stack.emplace(*it);
                 }
             }
             _dump(_stack);

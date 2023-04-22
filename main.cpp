@@ -21,7 +21,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
     }
 
     case Kind::Stm_: {
-        if (get(0)->kind == Kind::Epsilon) return nullptr;
+        if (get(0)->kind == Kind::epsilon) return nullptr;
         if (auto stmt = genAst(nonterm(2), ctx)) {
             stmt->cast<node::Statements>().pushFront(genAst(nonterm(1), ctx));
             return stmt;
@@ -47,7 +47,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
         default: return nullptr;
         }
 
-    case Kind::Fac_: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
+    case Kind::Fac_: return get(0)->kind == Kind::epsilon ? nullptr : genAst(nonterm(1), ctx);
 
     case Kind::Exp1:
         switch (get(0)->kind.value()) {
@@ -88,7 +88,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
     case Kind::Exp4_:
     case Kind::Exp5_:
     case Kind::Exp6_: {
-        if (get(0)->kind == Kind::Epsilon) return nullptr;
+        if (get(0)->kind == Kind::epsilon) return nullptr;
         auto left = genAst(nonterm(0), ctx);
         auto expr = genAst(nonterm(1), ctx);
         auto right = genAst(nonterm(2), ctx);
@@ -111,7 +111,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
 
     case Kind::Super:
         switch (get(0)->kind.value()) {
-        case Kind::Epsilon: return nullptr;
+        case Kind::epsilon: return nullptr;
         case Kind::SingleColon: {
             auto extract = genAst(nonterm(1), ctx);
             auto params = genAst(nonterm(2), ctx);
@@ -122,7 +122,7 @@ std::unique_ptr<node::Token> genAst(node::Nonterm &self, Context &ctx) {
         }
 
     case Kind::Params:
-    case Kind::Annot: return get(0)->kind == Kind::Epsilon ? nullptr : genAst(nonterm(1), ctx);
+    case Kind::Annot: return get(0)->kind == Kind::epsilon ? nullptr : genAst(nonterm(1), ctx);
 
     case Kind::Id: return std::make_unique<node::Set>(self.view);
 

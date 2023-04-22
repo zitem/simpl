@@ -15,7 +15,7 @@ struct Process {
 class Parser {
 public:
     using CFG = std::map<Kind, std::vector<std::vector<Kind>>>;
-    void setupGramma(CFG cfg, Kind root = Kind::Root, Kind epsilon = Kind::Epsilon);
+    void setupGramma(CFG cfg, Kind root = Kind::Root, Kind epsilon = Kind::epsilon);
     void setRawText(std::string const &str);
     std::stack<std::unique_ptr<node::Token>> const &getCst() const;
     int parse(node::Token const &input);
@@ -43,7 +43,7 @@ private:
 
 private:
     Kind _root{Kind::Root};
-    Kind _epsilon{Kind::Epsilon};
+    Kind _epsilon{Kind::epsilon};
     std::array<bool, Kind::Size> _nonterms;
     std::map<Kind, std::map<Kind, int>> _first;
     std::map<Kind, std::set<FoKind>> _follow;

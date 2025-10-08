@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <deque>
@@ -7,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <sstream>
 #include <stack>

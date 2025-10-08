@@ -27,13 +27,12 @@ module Fib {
 ## Build
 
 ``` pwsh
-# windows
-cmake -G Ninja
-ninja
+cmake . -Bbuild
+cmake --build build
 ```
 
-## Run
+## Run (Windows)
 
 ``` pwsh
-./simplc Test.sip
+./build/Debug/simplc Test.sip
 ```
